@@ -10,19 +10,20 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
-    "@vercel/kv": "^3.0.0",
+    "@vercel/blob": "^2.3.3",
     "nanoid": "^5.1.7",
-    "next": "14.2.5",
+    "next": "^14.2.35",
     "qrcode.react": "^4.2.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "vercel": "^32.3.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
-    "eslint-config-next": "14.2.5",
+    "eslint-config-next": "^16.2.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
