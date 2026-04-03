@@ -1,2 +1,4 @@
 # GhostLink
-a personalized link generator which builds a personality for each link pressed 
+> One link. Infinite Experinces. adaptive link experience for modern web.
+
+GhostLink is 
