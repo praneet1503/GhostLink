@@ -72,6 +72,20 @@ export function hasOpenRouterApiKey(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY?.trim());
 }
 
+function resolveHttpReferer(): string {
+  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  const vercelHost = process.env.VERCEL_URL?.trim();
+  if (vercelHost) {
+    return `https://${vercelHost}`;
+  }
+
+  return "http://localhost:3000";
+}
+
 function getString(value: unknown, fieldName: string, maxLength: number): string {
   if (typeof value !== "string") {
     throw new Error(`OpenRouter output missing ${fieldName}.`);
@@ -173,7 +187,7 @@ export async function personalizeWithOpenRouter(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000",
+          "HTTP-Referer": resolveHttpReferer(),
         "X-Title": "GhostLink",
       },
       body: JSON.stringify({

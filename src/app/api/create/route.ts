@@ -62,20 +62,26 @@ function isValidHttpUrl(value: string): boolean {
 }
 
 function resolveBaseUrl(request: NextRequest): string {
+  const headerHost =
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const headerProto = request.headers.get("x-forwarded-proto");
+  const vercelHost = process.env.VERCEL_URL?.trim();
+
+  // In Vercel deployments, always prefer the active request/deployment host.
+  if (process.env.VERCEL === "1") {
+    const host = headerHost ?? vercelHost;
+    if (host) {
+      return `${headerProto ?? "https"}://${host}`.replace(/\/+$/, "");
+    }
+  }
+
   const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
   if (configured) {
     return configured.replace(/\/+$/, "");
   }
 
-  const host =
-    request.headers.get("x-forwarded-host") ??
-    request.headers.get("host") ??
-    "localhost:3000";
-
-  const protocol =
-    request.headers.get("x-forwarded-proto") ??
-    (host.includes("localhost") ? "http" : "https");
-
+  const host = headerHost ?? vercelHost ?? "localhost:3000";
+  const protocol = headerProto ?? (host.includes("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
 }
 
