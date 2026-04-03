@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
+import { showToast } from "@/lib/toast";
 import type { CreateLinkResponse } from "@/types";
 
 interface CreateFormState {
@@ -60,10 +61,20 @@ export default function CreatePage() {
       }
 
       setCreatedLink({ slug: data.slug, url: data.url });
+      showToast({
+        title: "GhostLink created",
+        description: "Your adaptive URL is ready",
+        kind: "success",
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not create your GhostLink.",
       );
+      showToast({
+        title: "Create failed",
+        description: "Please check your fields and retry",
+        kind: "error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +106,12 @@ export default function CreatePage() {
                 className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
               >
                 Open preview
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
+              >
+                Open dashboard
               </Link>
             </div>
           </div>
@@ -235,6 +252,15 @@ export default function CreatePage() {
               Back to landing
             </Link>
           </div>
+
+          {isSubmitting ? (
+            <div className="mt-4 rounded-2xl border border-slate-200/20 bg-slate-950/35 p-4">
+              <div className="skeleton-block h-4 w-36" />
+              <div className="mt-3 skeleton-block h-4 w-full" />
+              <div className="mt-2 skeleton-block h-4 w-11/12" />
+              <div className="mt-2 skeleton-block h-4 w-10/12" />
+            </div>
+          ) : null}
         </form>
       </div>
     </main>

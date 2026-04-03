@@ -16,9 +16,13 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
   const [signals, setSignals] = useState<BrowserSignals | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [source, setSource] = useState<ResolveResponse["source"] | null>(null);
+
+  const slugLooksValid = /^[a-z0-9-]{4,48}$/i.test(slug);
 
   const handleResolved = useCallback((response: ResolveResponse) => {
     setContent(response.content);
+    setSource(response.source);
     setIsLoading(false);
   }, []);
 
@@ -31,18 +35,24 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
     setIsLoading(false);
   }, []);
 
+  const showNotFound =
+    !slugLooksValid ||
+    (errorMessage && /not found|unavailable|missing/i.test(errorMessage));
+
   return (
     <main className="relative isolate min-h-screen overflow-hidden px-6 py-10 sm:px-8 lg:px-10">
-      <SignalCollector
-        slug={slug}
-        onResolved={handleResolved}
-        onSignals={handleSignals}
-        onError={handleError}
-      />
+      {slugLooksValid ? (
+        <SignalCollector
+          slug={slug}
+          onResolved={handleResolved}
+          onSignals={handleSignals}
+          onError={handleError}
+        />
+      ) : null}
 
       <div className="mx-auto flex min-h-[80vh] w-full max-w-3xl flex-col justify-center">
         {isLoading ? (
-          <section className="hero-panel text-center">
+          <section className="hero-panel reveal-up text-center">
             <p className="text-5xl motion-safe:animate-pulse" aria-hidden="true">
               👻
             </p>
@@ -50,27 +60,46 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
               Preparing your experience...
             </h1>
             <p className="mt-4 text-base text-slate-200/80">Reading the room...</p>
+            <p className="mt-2 text-sm text-slate-200/65">Collecting passive signals, then tailoring your page.</p>
           </section>
         ) : null}
 
         {!isLoading && errorMessage ? (
-          <section className="hero-panel text-center">
-            <h1 className="text-3xl text-slate-50 sm:text-4xl">Link unavailable</h1>
-            <p className="mt-4 text-base text-slate-200/80">{errorMessage}</p>
+          <section className="hero-panel reveal-up text-center">
+            <h1 className="text-3xl text-slate-50 sm:text-4xl">
+              {showNotFound ? "Link not found" : "Link unavailable"}
+            </h1>
+            <p className="mt-4 text-base text-slate-200/80">
+              {showNotFound
+                ? "This GhostLink does not exist or has expired."
+                : errorMessage}
+            </p>
             <div className="mt-7">
               <Link
                 href="/"
                 className="inline-flex rounded-full bg-[color:var(--accent-cyan)] px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:-translate-y-0.5 hover:brightness-110"
               >
-                Back to home
+                Create a new GhostLink
               </Link>
             </div>
           </section>
         ) : null}
 
         {!isLoading && !errorMessage && content ? (
-          <section className="space-y-5">
+          <section className="reveal-up space-y-5">
+            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.14em]">
+              <span className="rounded-full border border-slate-200/25 bg-slate-950/35 px-3 py-1 text-slate-200/75">
+                Source: {source ?? "unknown"}
+              </span>
+              {source === "fallback" ? (
+                <span className="rounded-full border border-amber-200/35 bg-amber-900/20 px-3 py-1 text-amber-100/90">
+                  Served original content due to temporary AI delay
+                </span>
+              ) : null}
+            </div>
+
             <ContentRenderer content={content} />
+
             {signals ? (
               <div className="rounded-2xl border border-slate-200/20 bg-slate-950/35 p-4 text-sm text-slate-200/75">
                 <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">
@@ -83,6 +112,10 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
                 </p>
               </div>
             ) : null}
+
+            <footer className="pt-2 text-center text-xs uppercase tracking-[0.16em] text-slate-200/55">
+              Made with GhostLink
+            </footer>
           </section>
         ) : null}
       </div>

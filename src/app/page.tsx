@@ -48,12 +48,20 @@ export default function Home() {
               GhostLink
             </span>
           </div>
-          <Link
-            href="/create"
-            className="rounded-full border border-cyan-200/40 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20 sm:text-sm"
-          >
-            Launch Creator
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="rounded-full border border-slate-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10 sm:text-sm"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/create"
+              className="rounded-full border border-cyan-200/40 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20 sm:text-sm"
+            >
+              Launch Creator
+            </Link>
+          </div>
         </header>
 
         <section className="mt-14 grid items-start gap-12 lg:mt-20 lg:grid-cols-[1.15fr_0.85fr]">

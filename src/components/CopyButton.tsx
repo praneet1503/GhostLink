@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { showToast } from "@/lib/toast";
+
 interface CopyButtonProps {
   text: string;
   className?: string;
@@ -42,8 +44,27 @@ export default function CopyButton({
     try {
       const copied = await copyTextToClipboard(text);
       setStatus(copied ? "copied" : "failed");
+
+      if (copied) {
+        showToast({
+          title: "Link copied",
+          description: "URL copied to clipboard",
+          kind: "success",
+        });
+      } else {
+        showToast({
+          title: "Copy failed",
+          description: "Could not copy link",
+          kind: "error",
+        });
+      }
     } catch {
       setStatus("failed");
+      showToast({
+        title: "Copy failed",
+        description: "Could not copy link",
+        kind: "error",
+      });
     }
 
     window.setTimeout(() => {

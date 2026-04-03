@@ -97,3 +97,25 @@ export interface ResolveResponse {
   content: PersonalizedContent;
   source: "ai" | "heuristic" | "fallback";
 }
+
+export interface LinkSummary {
+  id: string;
+  url: string;
+  title: string;
+  createdAt: string;
+  visits: number;
+  recentSignals: SignalLog[];
+}
+
+export interface LinksResponse {
+  links: LinkSummary[];
+}
+
+export interface AnalyticsResponse {
+  slug: string;
+  visits: number;
+  tones: Record<string, number>;
+  referrers: Record<string, number>;
+  devices: Record<string, number>;
+  recentSignals: SignalLog[];
+}

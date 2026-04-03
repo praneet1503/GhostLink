@@ -10,11 +10,18 @@ export default function ContentRenderer({ content }: ContentRendererProps) {
     .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph.length > 0);
 
+  const toneLabel = `${content.tone[0].toUpperCase()}${content.tone.slice(1)}`;
+
   return (
     <article className="hero-panel">
-      <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/72">
-        Personalized for this visit
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/72">
+          Personalized for this visit
+        </p>
+        <span className="rounded-full border border-cyan-100/35 bg-cyan-900/20 px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-50">
+          Tone: {toneLabel}
+        </span>
+      </div>
       <h1 className="mt-3 text-4xl leading-tight text-slate-50 sm:text-5xl">
         {content.headline}
       </h1>
