@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getGhostLink, recordVisit } from "@/lib/kv";
-import type {
-  BrowserSignals,
-  PersonalizedContent,
-  ReferrerType,
-  ResolveResponse,
-  Tone,
-} from "@/types";
+import {
+  buildFallbackOriginalContent,
+  buildHeuristicContent,
+  inferPersonality,
+} from "@/lib/personalization";
+import {
+  OpenRouterTimeoutError,
+  hasOpenRouterApiKey,
+  personalizeWithOpenRouter,
+} from "@/lib/openrouter";
+import type { BrowserSignals, ResolveResponse } from "@/types";
 
 type ResolvePayloadInput = {
   slug?: unknown;
@@ -82,82 +86,6 @@ function parseSignals(input: unknown): BrowserSignals | null {
   };
 }
 
-function inferTone(signals: BrowserSignals): Tone {
-  if (signals.referrer === "linkedin" || signals.referrer === "github") {
-    return "professional";
-  }
-
-  if (signals.timeOfDay === "night" && signals.referrer === "whatsapp") {
-    return "playful";
-  }
-
-  if (signals.connectionSpeed === "slow") {
-    return "urgent";
-  }
-
-  return "casual";
-}
-
-function inferPersonality(signals: BrowserSignals): string {
-  if (signals.referrer === "linkedin") {
-    return "Career-focused explorer";
-  }
-
-  if (signals.referrer === "github") {
-    return "Technical deep-diver";
-  }
-
-  if (signals.referrer === "whatsapp" && signals.timeOfDay === "night") {
-    return "Night owl friend";
-  }
-
-  if (signals.deviceType === "mobile") {
-    return "On-the-go visitor";
-  }
-
-  return "Curious browser";
-}
-
-function getHeadlinePrefix(referrer: ReferrerType, tone: Tone): string {
-  if (referrer === "linkedin") {
-    return "A quick professional snapshot:";
-  }
-
-  if (referrer === "github") {
-    return "Technical context first:";
-  }
-
-  if (referrer === "whatsapp") {
-    return tone === "playful"
-      ? "You made it, here is the fun version:"
-      : "You made it, here is the quick version:";
-  }
-
-  return tone === "urgent"
-    ? "Fast version for your connection:"
-    : "Welcome, here is the tailored version:";
-}
-
-function buildHeuristicContent(
-  title: string,
-  body: string,
-  cta: string | undefined,
-  ctaUrl: string | undefined,
-  signals: BrowserSignals,
-): PersonalizedContent {
-  const tone = inferTone(signals);
-  const prefix = getHeadlinePrefix(signals.referrer, tone);
-
-  return {
-    title,
-    headline: `${prefix} ${title}`,
-    body,
-    cta: cta ?? "Explore more",
-    ctaUrl,
-    tone,
-  };
-}
-
 export async function POST(request: NextRequest) {
   let payload: ResolvePayloadInput;
 
@@ -182,21 +110,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
   }
 
-  const content = buildHeuristicContent(
-    link.originalContent.title,
-    link.originalContent.body,
-    link.originalContent.cta,
-    link.originalContent.ctaUrl,
-    signals,
-  );
+  let content = buildHeuristicContent(link.originalContent, signals);
+  let personality = inferPersonality(signals);
+  let source: ResolveResponse["source"] = "heuristic";
 
-  const personality = inferPersonality(signals);
+  if (hasOpenRouterApiKey()) {
+    try {
+      const aiResult = await personalizeWithOpenRouter(link.originalContent, signals);
+      content = aiResult.content;
+      personality = aiResult.aiPersonality;
+      source = "ai";
+    } catch (error) {
+      console.error("OpenRouter personalization failed", error);
+      content = buildFallbackOriginalContent(link.originalContent, signals);
+      source = "fallback";
+
+      if (error instanceof OpenRouterTimeoutError) {
+        personality = `${personality} (timeout fallback)`;
+      }
+    }
+  }
+
   await recordVisit(slug, signals, personality, content.tone);
 
-  const response: ResolveResponse = {
+  return NextResponse.json({
     content,
-    source: "heuristic",
-  };
-
-  return NextResponse.json(response);
+    source,
+  } satisfies ResolveResponse);
 }

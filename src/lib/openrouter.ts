@@ -138,13 +138,18 @@ function parseAiPayload(rawContent: string): AiPayload {
 
   const obj = parsed as Record<string, unknown>;
 
+  const aiPersonality =
+    typeof obj.aiPersonality === "string" && obj.aiPersonality.trim()
+      ? obj.aiPersonality.trim().slice(0, 160)
+      : "Adaptive visitor";
+
   return {
     title: getString(obj.title, "title", 160),
     headline: getString(obj.headline, "headline", 220),
     body: getString(obj.body, "body", 8000),
     cta: getString(obj.cta, "cta", 120),
     tone: parseTone(obj.tone),
-    aiPersonality: getString(obj.aiPersonality, "aiPersonality", 160),
+    aiPersonality,
   };
 }
 
