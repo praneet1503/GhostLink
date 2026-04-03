@@ -66,22 +66,24 @@ function resolveBaseUrl(request: NextRequest): string {
     request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   const headerProto = request.headers.get("x-forwarded-proto");
   const vercelHost = process.env.VERCEL_URL?.trim();
+  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
 
-  // In Vercel deployments, always prefer the active request/deployment host.
-  if (process.env.VERCEL === "1") {
-    const host = headerHost ?? vercelHost;
-    if (host) {
-      return `${headerProto ?? "https"}://${host}`.replace(/\/+$/, "");
-    }
+  // Always prefer the current request host when present.
+  if (headerHost) {
+    const protocol = headerProto ?? (headerHost.includes("localhost") ? "http" : "https");
+    return `${protocol}://${headerHost}`.replace(/\/+$/, "");
   }
 
-  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (vercelHost) {
+    return `https://${vercelHost}`.replace(/\/+$/, "");
+  }
+
   if (configured) {
     return configured.replace(/\/+$/, "");
   }
 
-  const host = headerHost ?? vercelHost ?? "localhost:3000";
-  const protocol = headerProto ?? (host.includes("localhost") ? "http" : "https");
+  const host = "localhost:3000";
+  const protocol = "http";
   return `${protocol}://${host}`;
 }
 

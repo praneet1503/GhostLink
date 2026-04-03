@@ -73,14 +73,14 @@ export function hasOpenRouterApiKey(): boolean {
 }
 
 function resolveHttpReferer(): string {
-  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
   const vercelHost = process.env.VERCEL_URL?.trim();
   if (vercelHost) {
     return `https://${vercelHost}`;
+  }
+
+  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
   }
 
   return "http://localhost:3000";
