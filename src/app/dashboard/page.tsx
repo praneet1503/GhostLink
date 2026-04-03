@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
 import type { AnalyticsResponse, LinkSummary, LinksResponse } from "@/types";
@@ -159,8 +160,29 @@ export default function DashboardPage() {
         ) : null}
 
         {isLoadingLinks ? (
-          <section className="hero-panel animate-pulse">
-            <p className="text-sm text-slate-200/70">Loading your links...</p>
+          <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-4">
+              <article className="rounded-3xl border border-slate-200/20 bg-slate-950/35 p-5">
+                <div className="skeleton-block h-6 w-48" />
+                <div className="mt-3 skeleton-block h-4 w-64" />
+                <div className="mt-4 skeleton-block h-4 w-full" />
+                <div className="mt-2 skeleton-block h-4 w-5/6" />
+              </article>
+              <article className="rounded-3xl border border-slate-200/20 bg-slate-950/35 p-5">
+                <div className="skeleton-block h-6 w-56" />
+                <div className="mt-3 skeleton-block h-4 w-72" />
+                <div className="mt-4 skeleton-block h-4 w-full" />
+                <div className="mt-2 skeleton-block h-4 w-4/6" />
+              </article>
+            </div>
+            <aside className="hero-panel h-fit">
+              <div className="skeleton-block h-5 w-36" />
+              <div className="mt-3 skeleton-block h-8 w-3/4" />
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="skeleton-block h-16 w-full" />
+                <div className="skeleton-block h-16 w-full" />
+              </div>
+            </aside>
           </section>
         ) : null}
 
@@ -203,9 +225,20 @@ export default function DashboardPage() {
                           Created {formatTimestamp(link.createdAt)}
                         </p>
                       </div>
-                      <span className="rounded-full border border-cyan-100/30 px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-100/80">
-                        {link.visits} visits
-                      </span>
+                      <div className="flex items-start gap-3">
+                        <span className="rounded-full border border-cyan-100/30 px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-100/80">
+                          {link.visits} visits
+                        </span>
+                        <div className="rounded-lg border border-slate-300/20 bg-slate-950/45 p-1">
+                          <QRCodeSVG
+                            value={link.url}
+                            size={56}
+                            bgColor="transparent"
+                            fgColor="#ecf3ff"
+                            level="M"
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <p className="mt-3 break-all text-sm text-slate-100/85">{link.url}</p>
@@ -259,7 +292,11 @@ export default function DashboardPage() {
               )}
 
               {isLoadingAnalytics ? (
-                <p className="mt-4 text-sm text-slate-200/70">Loading analytics...</p>
+                <div className="mt-4 space-y-2">
+                  <div className="skeleton-block h-4 w-40" />
+                  <div className="skeleton-block h-4 w-full" />
+                  <div className="skeleton-block h-4 w-10/12" />
+                </div>
               ) : null}
 
               {!isLoadingAnalytics && analytics ? (

@@ -61,6 +61,12 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
             </h1>
             <p className="mt-4 text-base text-slate-200/80">Reading the room...</p>
             <p className="mt-2 text-sm text-slate-200/65">Collecting passive signals, then tailoring your page.</p>
+              <div className="mx-auto mt-6 max-w-xl space-y-2">
+                <div className="skeleton-block h-4 w-2/3" />
+                <div className="skeleton-block h-4 w-full" />
+                <div className="skeleton-block h-4 w-11/12" />
+                <div className="skeleton-block h-4 w-5/6" />
+              </div>
           </section>
         ) : null}
 
