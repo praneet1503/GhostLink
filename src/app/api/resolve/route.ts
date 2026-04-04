@@ -20,6 +20,20 @@ type ResolvePayloadInput = {
   browserSignals?: unknown;
 };
 
+function deriveSlugFromReferer(referer: string | null): string {
+  if (!referer) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(referer);
+    const match = parsed.pathname.match(/^\/g\/([^/?#]+)/i);
+    return match?.[1]?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 const allowedDeviceTypes = ["mobile", "tablet", "desktop"] as const;
 const allowedScreenSizes = ["small", "medium", "large"] as const;
 const allowedTimes = ["morning", "afternoon", "evening", "night"] as const;
@@ -110,7 +124,9 @@ export async function POST(request: NextRequest) {
   }
 
   const slug = toStringValue(
-    payload.slug ?? request.nextUrl.searchParams.get("slug"),
+    payload.slug ??
+      request.nextUrl.searchParams.get("slug") ??
+      deriveSlugFromReferer(request.headers.get("referer")),
     "",
   );
   if (!slug) {
