@@ -1,5 +1,6 @@
 import type {
   BrowserSignals,
+  MessageVariant,
   OriginalContent,
   PersonalizedContent,
   Tone,
@@ -59,6 +60,11 @@ interface AiPayload {
 export interface OpenRouterPersonalization {
   content: PersonalizedContent;
   aiPersonality: string;
+}
+
+interface AiMessageSelectionPayload {
+  messageId: string;
+  aiPersonality?: string;
 }
 
 export class OpenRouterTimeoutError extends Error {
@@ -237,6 +243,116 @@ export async function personalizeWithOpenRouter(
         tone: aiPayload.tone,
       },
       aiPersonality: aiPayload.aiPersonality,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new OpenRouterTimeoutError(
+        "OpenRouter timed out after 10 seconds.",
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function selectMessageIdWithOpenRouter(
+  signals: BrowserSignals,
+  messages: MessageVariant[],
+  fallbackMessageId: string,
+): Promise<{ messageId: string; aiPersonality: string }> {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not configured.");
+  }
+
+  if (messages.length === 0) {
+    throw new Error("No message variants were provided for AI selection.");
+  }
+
+  const selectorPrompt = `You choose the best message variant for a visitor based on passive browser signals.
+Choose exactly one message ID from the provided list.
+Do not rewrite content.
+
+Return ONLY valid JSON in this schema:
+{
+  "messageId": "string",
+  "aiPersonality": "string"
+}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, OPENROUTER_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": resolveHttpReferer(),
+        "X-Title": "GhostLink",
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: "system", content: selectorPrompt },
+          {
+            role: "user",
+            content: JSON.stringify({
+              signals,
+              availableMessages: messages.map((message) => ({
+                id: message.id,
+                priority: message.priority,
+                content: message.content,
+                conditionCount: message.conditions.length,
+              })),
+              fallbackMessageId,
+            }),
+          },
+        ],
+        temperature: 0.2,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      const snippet = text.slice(0, 500);
+      throw new Error(`OpenRouter request failed (${response.status}): ${snippet}`);
+    }
+
+    let payload: OpenRouterResponse;
+    try {
+      payload = JSON.parse(text) as OpenRouterResponse;
+    } catch {
+      throw new Error("OpenRouter response body was not valid JSON.");
+    }
+
+    const modelText = payload.choices?.[0]?.message?.content;
+    if (!modelText || typeof modelText !== "string") {
+      throw new Error("OpenRouter returned no message content.");
+    }
+
+    const parsedSelection = JSON.parse(
+      extractJsonObject(modelText),
+    ) as AiMessageSelectionPayload;
+
+    const selectedId =
+      typeof parsedSelection.messageId === "string"
+        ? parsedSelection.messageId.trim()
+        : "";
+    const selectedExists = messages.some((message) => message.id === selectedId);
+
+    return {
+      messageId: selectedExists ? selectedId : fallbackMessageId,
+      aiPersonality:
+        typeof parsedSelection.aiPersonality === "string" &&
+        parsedSelection.aiPersonality.trim()
+          ? parsedSelection.aiPersonality.trim().slice(0, 160)
+          : "AI signal router",
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {

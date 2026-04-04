@@ -5,8 +5,12 @@ import { FormEvent, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
+import MessageRuleBuilder, {
+  type DraftCondition,
+  type DraftMessage,
+} from "@/components/MessageRuleBuilder";
 import { showToast } from "@/lib/toast";
-import type { CreateLinkResponse } from "@/types";
+import type { ConditionOperator, CreateLinkResponse, SignalKey } from "@/types";
 
 interface CreateFormState {
   title: string;
@@ -19,32 +23,239 @@ type CreateApiResponse = Partial<CreateLinkResponse> & {
   error?: string;
 };
 
+type CreateMode = "single" | "multi";
+
+function createId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createDraftCondition(): DraftCondition {
+  return {
+    id: createId("condition"),
+    signal: "referrer",
+    operator: "equals",
+    value: "",
+  };
+}
+
+function createDraftMessage(): DraftMessage {
+  return {
+    id: createId("message"),
+    title: "",
+    body: "",
+    cta: "",
+    ctaUrl: "",
+    conditions: [],
+  };
+}
+
+function toConditionPayload(condition: DraftCondition): {
+  signal: SignalKey;
+  operator: ConditionOperator;
+  value: string | string[];
+} | null {
+  const normalizedValue = condition.value.trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  if (condition.operator === "oneOf") {
+    const values = normalizedValue
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
+    if (values.length === 0) {
+      return null;
+    }
+
+    return {
+      signal: condition.signal,
+      operator: condition.operator,
+      value: values,
+    };
+  }
+
+  return {
+    signal: condition.signal,
+    operator: condition.operator,
+    value: normalizedValue,
+  };
+}
+
 export default function CreatePage() {
+  const [mode, setMode] = useState<CreateMode>("single");
   const [form, setForm] = useState<CreateFormState>({
     title: "",
     body: "",
     cta: "",
     ctaUrl: "",
   });
+  const [multiMessages, setMultiMessages] = useState<DraftMessage[]>([
+    createDraftMessage(),
+  ]);
+  const [defaultMessageId, setDefaultMessageId] = useState<string>(
+    multiMessages[0].id,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdLink, setCreatedLink] = useState<CreateLinkResponse | null>(null);
 
   const canSubmit = useMemo(() => {
-    return form.title.trim().length > 0 && form.body.trim().length > 0;
-  }, [form.body, form.title]);
+    if (mode === "single") {
+      return form.title.trim().length > 0 && form.body.trim().length > 0;
+    }
+
+    return (
+      multiMessages.length > 0 &&
+      multiMessages.every((message) => {
+        return message.title.trim().length > 0 && message.body.trim().length > 0;
+      }) &&
+      multiMessages.some((message) => message.id === defaultMessageId)
+    );
+  }, [defaultMessageId, form.body, form.title, mode, multiMessages]);
+
+  const updateMessage = (messageId: string, patch: Partial<DraftMessage>): void => {
+    setMultiMessages((current) => {
+      return current.map((message) => {
+        return message.id === messageId ? { ...message, ...patch } : message;
+      });
+    });
+  };
+
+  const addMessage = (): void => {
+    const newMessage = createDraftMessage();
+    setMultiMessages((current) => [...current, newMessage]);
+  };
+
+  const removeMessage = (messageId: string): void => {
+    setMultiMessages((current) => {
+      if (current.length === 1) {
+        return current;
+      }
+
+      const next = current.filter((message) => message.id !== messageId);
+      if (!next.some((message) => message.id === defaultMessageId)) {
+        setDefaultMessageId(next[0].id);
+      }
+
+      return next;
+    });
+  };
+
+  const moveMessage = (messageId: string, direction: "up" | "down"): void => {
+    setMultiMessages((current) => {
+      const index = current.findIndex((message) => message.id === messageId);
+      if (index < 0) {
+        return current;
+      }
+
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (target < 0 || target >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
+  };
+
+  const addCondition = (messageId: string): void => {
+    setMultiMessages((current) => {
+      return current.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        return {
+          ...message,
+          conditions: [...message.conditions, createDraftCondition()],
+        };
+      });
+    });
+  };
+
+  const updateCondition = (
+    messageId: string,
+    conditionId: string,
+    patch: Partial<DraftCondition>,
+  ): void => {
+    setMultiMessages((current) => {
+      return current.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        return {
+          ...message,
+          conditions: message.conditions.map((condition) => {
+            return condition.id === conditionId
+              ? { ...condition, ...patch }
+              : condition;
+          }),
+        };
+      });
+    });
+  };
+
+  const removeCondition = (messageId: string, conditionId: string): void => {
+    setMultiMessages((current) => {
+      return current.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        return {
+          ...message,
+          conditions: message.conditions.filter((condition) => condition.id !== conditionId),
+        };
+      });
+    });
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     setErrorMessage(null);
     setIsSubmitting(true);
 
-    const payload = {
-      title: form.title.trim(),
-      body: form.body.trim(),
-      cta: form.cta.trim() || undefined,
-      ctaUrl: form.ctaUrl.trim() || undefined,
-    };
+    const payload =
+      mode === "single"
+        ? {
+            messageMode: "single",
+            title: form.title.trim(),
+            body: form.body.trim(),
+            cta: form.cta.trim() || undefined,
+            ctaUrl: form.ctaUrl.trim() || undefined,
+          }
+        : {
+            messageMode: "multi",
+            defaultMessageId,
+            messages: multiMessages.map((message, index) => ({
+              id: message.id,
+              title: message.title.trim(),
+              body: message.body.trim(),
+              cta: message.cta.trim() || undefined,
+              ctaUrl: message.ctaUrl.trim() || undefined,
+              priority: index + 1,
+              conditions: message.conditions
+                .map((condition) => toConditionPayload(condition))
+                .filter(
+                  (
+                    condition,
+                  ): condition is {
+                    signal: SignalKey;
+                    operator: ConditionOperator;
+                    value: string | string[];
+                  } => Boolean(condition),
+                ),
+            })),
+          };
 
     try {
       const response = await fetch("/api/create", {
@@ -136,7 +347,11 @@ export default function CreatePage() {
                 type="button"
                 onClick={() => {
                   setCreatedLink(null);
+                  setMode("single");
                   setForm({ title: "", body: "", cta: "", ctaUrl: "" });
+                  const firstMessage = createDraftMessage();
+                  setMultiMessages([firstMessage]);
+                  setDefaultMessageId(firstMessage.id);
                 }}
                 className="mt-4 rounded-full border border-cyan-200/40 bg-cyan-200/12 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20"
               >
@@ -156,80 +371,121 @@ export default function CreatePage() {
           Create your GhostLink
         </p>
         <h1 className="mt-4 text-4xl text-slate-50 sm:text-5xl">
-          One input. Infinite variations.
+          One link. Context-driven messages.
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-200/80">
-          Add your original message once. GhostLink will adapt how it is delivered
-          based on who opens it.
+          Choose simple mode for one message, or define multiple messages with signal rules.
         </p>
 
+        <div className="mt-6 inline-flex rounded-full border border-slate-200/25 bg-slate-950/45 p-1">
+          <button
+            type="button"
+            onClick={() => setMode("single")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+              mode === "single"
+                ? "bg-cyan-200/85 text-slate-950"
+                : "text-slate-100 hover:bg-slate-100/10"
+            }`}
+          >
+            Single message
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("multi")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+              mode === "multi"
+                ? "bg-cyan-200/85 text-slate-950"
+                : "text-slate-100 hover:bg-slate-100/10"
+            }`}
+          >
+            Multi-message rules
+          </button>
+        </div>
+
         <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-              Title of your content
-            </span>
-            <input
-              value={form.title}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, title: event.target.value }))
-              }
-              type="text"
-              maxLength={120}
-              required
-              placeholder="Portfolio intro, campaign title, product launch..."
-              className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
+          {mode === "single" ? (
+            <>
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
+                  Title of your content
+                </span>
+                <input
+                  value={form.title}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, title: event.target.value }))
+                  }
+                  type="text"
+                  maxLength={120}
+                  required
+                  placeholder="Portfolio intro, campaign title, product launch..."
+                  className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
+                  Main body / description
+                </span>
+                <textarea
+                  value={form.body}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, body: event.target.value }))
+                  }
+                  rows={7}
+                  maxLength={7000}
+                  required
+                  placeholder="Describe your story, product, portfolio, or message..."
+                  className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
+                />
+              </label>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
+                    Call to action text (optional)
+                  </span>
+                  <input
+                    value={form.cta}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, cta: event.target.value }))
+                    }
+                    type="text"
+                    maxLength={80}
+                    placeholder="Book a call, View the repo, Buy now..."
+                    className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
+                    Call to action URL (optional)
+                  </span>
+                  <input
+                    value={form.ctaUrl}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, ctaUrl: event.target.value }))
+                    }
+                    type="url"
+                    placeholder="https://example.com"
+                    className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <MessageRuleBuilder
+              messages={multiMessages}
+              defaultMessageId={defaultMessageId}
+              onAddMessage={addMessage}
+              onRemoveMessage={removeMessage}
+              onMoveMessage={moveMessage}
+              onSetDefaultMessage={setDefaultMessageId}
+              onUpdateMessage={updateMessage}
+              onAddCondition={addCondition}
+              onUpdateCondition={updateCondition}
+              onRemoveCondition={removeCondition}
             />
-          </label>
-
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-              Main body / description
-            </span>
-            <textarea
-              value={form.body}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, body: event.target.value }))
-              }
-              rows={7}
-              maxLength={7000}
-              required
-              placeholder="Describe your story, product, portfolio, or message..."
-              className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
-            />
-          </label>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                Call to action text (optional)
-              </span>
-              <input
-                value={form.cta}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, cta: event.target.value }))
-                }
-                type="text"
-                maxLength={80}
-                placeholder="Book a call, View the repo, Buy now..."
-                className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
-              />
-            </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                Call to action URL (optional)
-              </span>
-              <input
-                value={form.ctaUrl}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, ctaUrl: event.target.value }))
-                }
-                type="url"
-                placeholder="https://example.com"
-                className="rounded-2xl border border-slate-300/25 bg-slate-900/55 px-4 py-3 text-base text-slate-50 outline-none transition placeholder:text-slate-300/50 focus:border-cyan-200/70"
-              />
-            </label>
-          </div>
+          )}
 
           {errorMessage ? (
             <p className="rounded-xl border border-rose-300/40 bg-rose-900/20 px-4 py-3 text-sm text-rose-100">

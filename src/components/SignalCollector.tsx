@@ -56,6 +56,10 @@ export default function SignalCollector({
         onResolved({
           content: payload.content,
           source: payload.source,
+          ...(payload.matchType ? { matchType: payload.matchType } : {}),
+          ...(payload.selectedMessageId
+            ? { selectedMessageId: payload.selectedMessageId }
+            : {}),
         });
       } catch (error) {
         if (!isActive) {

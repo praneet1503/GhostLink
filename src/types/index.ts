@@ -30,6 +30,14 @@ export type PlatformType =
 
 export type Tone = "professional" | "casual" | "playful" | "urgent";
 
+export type MessageMode = "single" | "multi";
+
+export type SignalKey = keyof BrowserSignals;
+
+export type ConditionOperator = "equals" | "includes" | "oneOf";
+
+export type ResolveMatchType = "rule" | "ai" | "default";
+
 export interface BrowserSignals {
   timezone: string;
   language: string;
@@ -52,17 +60,36 @@ export interface OriginalContent {
   imageUrl?: string;
 }
 
+export interface MessageCondition {
+  signal: SignalKey;
+  operator: ConditionOperator;
+  value: string | string[];
+}
+
+export interface MessageVariant {
+  id: string;
+  content: OriginalContent;
+  conditions: MessageCondition[];
+  priority: number;
+  createdAt: string;
+}
+
 export interface SignalLog {
   timestamp: string;
   signals: BrowserSignals;
   aiPersonality: string;
   toneServed: Tone | "unknown";
+  matchType?: ResolveMatchType;
+  selectedMessageId?: string;
 }
 
 export interface GhostLink {
   id: string;
   createdAt: string;
   originalContent: OriginalContent;
+  messageMode?: MessageMode;
+  messages?: MessageVariant[];
+  defaultMessageId?: string;
   visits: number;
   signals: SignalLog[];
 }
@@ -77,10 +104,21 @@ export interface PersonalizedContent {
 }
 
 export interface CreateLinkRequest {
-  title: string;
-  body: string;
+  messageMode?: MessageMode;
+  title?: string;
+  body?: string;
   cta?: string;
   ctaUrl?: string;
+  messages?: Array<{
+    id?: string;
+    title: string;
+    body: string;
+    cta?: string;
+    ctaUrl?: string;
+    conditions?: MessageCondition[];
+    priority?: number;
+  }>;
+  defaultMessageId?: string;
 }
 
 export interface CreateLinkResponse {
@@ -95,7 +133,9 @@ export interface ResolveRequest {
 
 export interface ResolveResponse {
   content: PersonalizedContent;
-  source: "ai" | "heuristic" | "fallback";
+  source: "ai" | "heuristic" | "fallback" | "rule";
+  matchType?: ResolveMatchType;
+  selectedMessageId?: string;
 }
 
 export interface LinkSummary {

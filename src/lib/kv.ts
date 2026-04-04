@@ -1,6 +1,14 @@
 import { get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
 
-import type { BrowserSignals, GhostLink, SignalLog, Tone } from "@/types";
+import type {
+  BrowserSignals,
+  GhostLink,
+  MessageCondition,
+  MessageVariant,
+  ResolveMatchType,
+  SignalLog,
+  Tone,
+} from "@/types";
 
 const BLOB_LINK_PREFIX = "ghostlink/links/";
 const BLOB_LINK_SUFFIX = ".json";
@@ -9,6 +17,20 @@ const EDGE_CONFIG_INDEX_KEY = "ghostlink-index";
 const EDGE_CONFIG_API_BASE = "https://api.vercel.com/v1/edge-config";
 const EDGE_CONFIG_READ_BASE = "https://edge-config.vercel.com";
 const MAX_SIGNAL_LOGS = 100;
+const SIGNAL_KEYS = new Set([
+  "timezone",
+  "language",
+  "deviceType",
+  "screenSize",
+  "timeOfDay",
+  "dayOfWeek",
+  "referrer",
+  "colorScheme",
+  "connectionSpeed",
+  "mouseSpeed",
+  "platform",
+]);
+const CONDITION_OPERATORS = new Set(["equals", "includes", "oneOf"]);
 
 type GhostLinkGlobal = {
   __ghostLinkMemoryStore__?: Map<string, GhostLink>;
@@ -115,6 +137,158 @@ function toErrorString(error: unknown): string {
   return String(error);
 }
 
+function createFallbackMessageVariant(link: GhostLink): MessageVariant {
+  return {
+    id: "single-default",
+    content: link.originalContent,
+    conditions: [],
+    priority: 1,
+    createdAt: link.createdAt,
+  };
+}
+
+function sanitizeConditions(value: unknown): MessageCondition[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item): MessageCondition | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const raw = item as Record<string, unknown>;
+      const signal =
+        typeof raw.signal === "string" && SIGNAL_KEYS.has(raw.signal)
+          ? raw.signal
+          : null;
+      const operator =
+        typeof raw.operator === "string" && CONDITION_OPERATORS.has(raw.operator)
+          ? raw.operator
+          : null;
+
+      if (!signal || !operator) {
+        return null;
+      }
+
+      const rawValue = raw.value;
+      if (operator === "oneOf") {
+        if (!Array.isArray(rawValue)) {
+          return null;
+        }
+
+        const values = rawValue
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0);
+
+        if (values.length === 0) {
+          return null;
+        }
+
+        return {
+            signal: signal as MessageCondition["signal"],
+            operator: operator as MessageCondition["operator"],
+          value: values,
+        };
+      }
+
+      if (typeof rawValue !== "string") {
+        return null;
+      }
+
+      const normalized = rawValue.trim();
+      if (!normalized) {
+        return null;
+      }
+
+      return {
+        signal: signal as MessageCondition["signal"],
+        operator: operator as MessageCondition["operator"],
+        value: normalized,
+      };
+    })
+    .filter((item): item is MessageCondition => Boolean(item));
+}
+
+function sanitizeMessageVariants(link: GhostLink, value: unknown): MessageVariant[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const variants = value
+    .map((item, index): MessageVariant | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const raw = item as Record<string, unknown>;
+      const id = typeof raw.id === "string" ? raw.id.trim() : "";
+      const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : link.createdAt;
+      const priority =
+        typeof raw.priority === "number" && Number.isFinite(raw.priority)
+          ? Math.max(1, Math.floor(raw.priority))
+          : index + 1;
+
+      const rawContent = raw.content;
+      if (!rawContent || typeof rawContent !== "object") {
+        return null;
+      }
+
+      const contentObj = rawContent as Record<string, unknown>;
+      const title = typeof contentObj.title === "string" ? contentObj.title.trim() : "";
+      const body = typeof contentObj.body === "string" ? contentObj.body.trim() : "";
+      if (!title || !body) {
+        return null;
+      }
+
+      const cta = typeof contentObj.cta === "string" ? contentObj.cta.trim() : "";
+      const ctaUrl = typeof contentObj.ctaUrl === "string" ? contentObj.ctaUrl.trim() : "";
+
+      return {
+        id: id || `message-${index + 1}`,
+        content: {
+          title,
+          body,
+          ...(cta ? { cta } : {}),
+          ...(ctaUrl ? { ctaUrl } : {}),
+        },
+        conditions: sanitizeConditions(raw.conditions),
+        priority,
+        createdAt,
+      };
+    })
+    .filter((item): item is MessageVariant => Boolean(item))
+    .sort((a, b) => a.priority - b.priority);
+
+  return variants;
+}
+
+function normalizeGhostLink(link: GhostLink): GhostLink {
+  const messageMode = link.messageMode === "multi" ? "multi" : "single";
+  const messages = sanitizeMessageVariants(link, link.messages);
+  const safeMessages =
+    messages.length > 0
+      ? messages
+      : messageMode === "multi"
+        ? [createFallbackMessageVariant(link)]
+        : [];
+
+  const defaultMessageId =
+    typeof link.defaultMessageId === "string" &&
+    safeMessages.some((message) => message.id === link.defaultMessageId)
+      ? link.defaultMessageId
+      : safeMessages[0]?.id;
+
+  return {
+    ...link,
+    messageMode,
+    messages: safeMessages,
+    defaultMessageId,
+  };
+}
+
 function parseGhostLink(raw: string): GhostLink | null {
   try {
     const parsed = JSON.parse(raw) as GhostLink;
@@ -130,7 +304,7 @@ function parseGhostLink(raw: string): GhostLink | null {
       return null;
     }
 
-    return parsed;
+    return normalizeGhostLink(parsed);
   } catch {
     return null;
   }
@@ -298,23 +472,25 @@ async function getGhostLinkFromBlob(slug: string): Promise<GhostLink | null> {
 }
 
 export async function saveGhostLink(link: GhostLink): Promise<void> {
-  memoryStore.set(link.id, link);
-  await addSlugToIndex(link.id);
+  const normalized = normalizeGhostLink(link);
 
-  await saveGhostLinkToBlob(link);
+  memoryStore.set(normalized.id, normalized);
+  await addSlugToIndex(normalized.id);
+
+  await saveGhostLinkToBlob(normalized);
 }
 
 export async function getGhostLink(slug: string): Promise<GhostLink | null> {
   const cached = memoryStore.get(slug);
   if (cached) {
-    return cached;
+    return normalizeGhostLink(cached);
   }
 
   const found = await getGhostLinkFromBlob(slug);
   if (found) {
-    memoryStore.set(slug, found);
+    memoryStore.set(slug, normalizeGhostLink(found));
     memoryIndex.add(slug);
-    return found;
+    return normalizeGhostLink(found);
   }
 
   return null;
@@ -325,6 +501,10 @@ export async function recordVisit(
   signals: BrowserSignals,
   aiPersonality: string,
   toneServed: Tone | "unknown",
+  context?: {
+    matchType?: ResolveMatchType;
+    selectedMessageId?: string;
+  },
 ): Promise<GhostLink | null> {
   const link = await getGhostLink(slug);
   if (!link) {
@@ -336,6 +516,10 @@ export async function recordVisit(
     signals,
     aiPersonality,
     toneServed,
+    ...(context?.matchType ? { matchType: context.matchType } : {}),
+    ...(context?.selectedMessageId
+      ? { selectedMessageId: context.selectedMessageId }
+      : {}),
   };
 
   const updated: GhostLink = {

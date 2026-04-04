@@ -131,8 +131,8 @@ export default function Home() {
             </h2>
             <div className="persona-frame mt-6">
               <div className="persona-strip">
-                {personaLines.map((line) => (
-                  <span key={line}>{line}</span>
+                {personaLines.map((line, index) => (
+                  <span key={`${line}-${index}`}>{line}</span>
                 ))}
               </div>
             </div>

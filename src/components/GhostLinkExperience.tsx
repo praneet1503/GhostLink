@@ -17,12 +17,14 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [source, setSource] = useState<ResolveResponse["source"] | null>(null);
+  const [matchType, setMatchType] = useState<ResolveResponse["matchType"]>(undefined);
 
   const slugLooksValid = /^[a-z0-9-]{4,48}$/i.test(slug);
 
   const handleResolved = useCallback((response: ResolveResponse) => {
     setContent(response.content);
     setSource(response.source);
+    setMatchType(response.matchType);
     setIsLoading(false);
   }, []);
 
@@ -104,7 +106,7 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
               ) : null}
             </div>
 
-            <ContentRenderer content={content} />
+            <ContentRenderer content={content} matchType={matchType} />
 
             {signals ? (
               <div className="rounded-2xl border border-slate-200/20 bg-slate-950/35 p-4 text-sm text-slate-200/75">

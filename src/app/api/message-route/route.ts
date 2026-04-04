@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getGhostLink, recordVisit } from "@/lib/kv";
+import { getGhostLink } from "@/lib/kv";
 import { selectMessageForSignals } from "@/lib/messageRouting";
-import {
-  buildFallbackOriginalContent,
-  buildHeuristicContent,
-  inferPersonality,
-} from "@/lib/personalization";
-import {
-  OpenRouterTimeoutError,
-  hasOpenRouterApiKey,
-  personalizeWithOpenRouter,
-} from "@/lib/openrouter";
-import type { BrowserSignals, ResolveResponse } from "@/types";
+import { buildFallbackOriginalContent } from "@/lib/personalization";
+import type { BrowserSignals } from "@/types";
 
-type ResolvePayloadInput = {
+type MessageRoutePayloadInput = {
   slug?: unknown;
   signals?: unknown;
 };
@@ -34,14 +25,7 @@ const allowedReferrers = [
 const allowedColorSchemes = ["dark", "light"] as const;
 const allowedSpeeds = ["slow", "fast", "unknown"] as const;
 const allowedMouseSpeeds = ["slow", "fast", "not_available"] as const;
-const allowedPlatforms = [
-  "windows",
-  "mac",
-  "linux",
-  "ios",
-  "android",
-  "other",
-] as const;
+const allowedPlatforms = ["windows", "mac", "linux", "ios", "android", "other"] as const;
 
 function toStringValue(value: unknown, fallback: string): string {
   if (typeof value !== "string") {
@@ -88,10 +72,10 @@ function parseSignals(input: unknown): BrowserSignals | null {
 }
 
 export async function POST(request: NextRequest) {
-  let payload: ResolvePayloadInput;
+  let payload: MessageRoutePayloadInput;
 
   try {
-    payload = (await request.json()) as ResolvePayloadInput;
+    payload = (await request.json()) as MessageRoutePayloadInput;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -111,53 +95,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
   }
 
-  if (link.messageMode === "multi" && link.messages && link.messages.length > 0) {
-    const selection = await selectMessageForSignals(
-      signals,
-      link.messages,
-      link.defaultMessageId,
+  if (link.messageMode !== "multi" || !link.messages || link.messages.length === 0) {
+    return NextResponse.json(
+      { error: "This link does not use multi-message routing." },
+      { status: 400 },
     );
-
-    const content = buildFallbackOriginalContent(selection.message.content, signals);
-
-    await recordVisit(slug, signals, selection.aiPersonality, content.tone, {
-      matchType: selection.matchType,
-      selectedMessageId: selection.message.id,
-    });
-
-    return NextResponse.json({
-      content,
-      source: selection.source,
-      matchType: selection.matchType,
-      selectedMessageId: selection.message.id,
-    } satisfies ResolveResponse);
   }
 
-  let content = buildHeuristicContent(link.originalContent, signals);
-  let personality = inferPersonality(signals);
-  let source: ResolveResponse["source"] = "heuristic";
-
-  if (hasOpenRouterApiKey()) {
-    try {
-      const aiResult = await personalizeWithOpenRouter(link.originalContent, signals);
-      content = aiResult.content;
-      personality = aiResult.aiPersonality;
-      source = "ai";
-    } catch (error) {
-      console.error("OpenRouter personalization failed", error);
-      content = buildFallbackOriginalContent(link.originalContent, signals);
-      source = "fallback";
-
-      if (error instanceof OpenRouterTimeoutError) {
-        personality = `${personality} (timeout fallback)`;
-      }
-    }
-  }
-
-  await recordVisit(slug, signals, personality, content.tone);
+  const selection = await selectMessageForSignals(
+    signals,
+    link.messages,
+    link.defaultMessageId,
+  );
 
   return NextResponse.json({
-    content,
-    source,
-  } satisfies ResolveResponse);
+    selectedMessageId: selection.message.id,
+    matchType: selection.matchType,
+    source: selection.source,
+    aiPersonality: selection.aiPersonality,
+    content: buildFallbackOriginalContent(selection.message.content, signals),
+  });
 }
