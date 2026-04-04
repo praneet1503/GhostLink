@@ -459,11 +459,40 @@ async function getGhostLinkFromBlob(slug: string): Promise<GhostLink | null> {
       access: "private",
     });
 
-    if (!result || result.statusCode !== 200 || !result.stream) {
+    if (!result) {
       return null;
     }
 
-    const payload = await new Response(result.stream).text();
+    if ("stream" in result && result.stream) {
+      const payload = await new Response(result.stream).text();
+      return parseGhostLink(payload);
+    }
+
+    const readUrl =
+      ("downloadUrl" in result && typeof result.downloadUrl === "string"
+        ? result.downloadUrl
+        : undefined) ??
+      ("url" in result && typeof result.url === "string"
+        ? result.url
+        : undefined) ??
+      ("blob" in result &&
+      result.blob &&
+      typeof result.blob === "object" &&
+      "url" in result.blob &&
+      typeof result.blob.url === "string"
+        ? result.blob.url
+        : undefined);
+
+    if (!readUrl) {
+      return null;
+    }
+
+    const response = await fetch(readUrl, { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.text();
     return parseGhostLink(payload);
   } catch (error) {
     console.error("Blob get failed, falling back to in-memory store", toErrorString(error));
