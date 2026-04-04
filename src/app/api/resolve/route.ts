@@ -17,6 +17,7 @@ import type { BrowserSignals, ResolveResponse } from "@/types";
 type ResolvePayloadInput = {
   slug?: unknown;
   signals?: unknown;
+  browserSignals?: unknown;
 };
 
 const allowedDeviceTypes = ["mobile", "tablet", "desktop"] as const;
@@ -65,9 +66,21 @@ function toEnum<T extends string>(
   return allowed.includes(normalized) ? normalized : fallback;
 }
 
-function parseSignals(input: unknown): BrowserSignals | null {
+function parseSignals(input: unknown): BrowserSignals {
   if (!input || typeof input !== "object") {
-    return null;
+    return {
+      timezone: "UTC",
+      language: "en-US",
+      deviceType: "desktop",
+      screenSize: "medium",
+      timeOfDay: "afternoon",
+      dayOfWeek: "weekday",
+      referrer: "other",
+      colorScheme: "light",
+      connectionSpeed: "unknown",
+      mouseSpeed: "not_available",
+      platform: "other",
+    };
   }
 
   const raw = input as Record<string, unknown>;
@@ -88,23 +101,23 @@ function parseSignals(input: unknown): BrowserSignals | null {
 }
 
 export async function POST(request: NextRequest) {
-  let payload: ResolvePayloadInput;
+  let payload: ResolvePayloadInput = {};
 
   try {
     payload = (await request.json()) as ResolvePayloadInput;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    payload = {};
   }
 
-  const slug = toStringValue(payload.slug, "");
+  const slug = toStringValue(
+    payload.slug ?? request.nextUrl.searchParams.get("slug"),
+    "",
+  );
   if (!slug) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const signals = parseSignals(payload.signals);
-  if (!signals) {
-    return NextResponse.json({ error: "Missing or invalid signals." }, { status: 400 });
-  }
+  const signals = parseSignals(payload.signals ?? payload.browserSignals);
 
   const link = await getGhostLink(slug);
   if (!link) {
