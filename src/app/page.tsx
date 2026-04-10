@@ -104,19 +104,6 @@ export default function Home() {
                 How It Works
               </a>
             </div>
-
-            <div
-              className="reveal-up mt-8 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-cyan-100/70 sm:text-sm"
-              style={{ animationDelay: "360ms" }}
-            >
-              <span className="rounded-full border border-slate-300/30 px-3 py-1.5">
-                Same URL
-              </span>
-              <span className="h-px w-8 bg-slate-200/25" aria-hidden="true" />
-              <span className="rounded-full border border-slate-300/30 px-3 py-1.5">
-                Infinite Experiences
-              </span>
-            </div>
           </div>
 
           <aside

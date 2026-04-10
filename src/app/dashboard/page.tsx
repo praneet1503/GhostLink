@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [expandedQrLink, setExpandedQrLink] = useState<LinkSummary | null>(null);
 
   const selectedLink = useMemo(() => {
     if (!selectedSlug) {
@@ -115,6 +116,23 @@ export default function DashboardPage() {
     };
   }, [selectedSlug]);
 
+  useEffect(() => {
+    if (!expandedQrLink) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setExpandedQrLink(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [expandedQrLink]);
+
   const toneEntries = useMemo(() => {
     return formatCounterEntries(analytics?.tones ?? {});
   }, [analytics?.tones]);
@@ -132,9 +150,7 @@ export default function DashboardPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-100/70">
-              Phase 6 dashboard
-            </p>
+            
             <h1 className="mt-2 text-4xl text-slate-50 sm:text-5xl">Your GhostLinks</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -229,7 +245,14 @@ export default function DashboardPage() {
                         <span className="rounded-full border border-cyan-100/30 px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-100/80">
                           {link.visits} visits
                         </span>
-                        <div className="rounded-lg border border-slate-300/20 bg-slate-950/45 p-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedQrLink(link);
+                          }}
+                          className="group relative rounded-lg border border-slate-300/20 bg-slate-950/45 p-1 transition hover:-translate-y-0.5 hover:border-cyan-100/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+                          aria-label={`Open larger QR code for ${link.title}`}
+                        >
                           <QRCodeSVG
                             value={link.url}
                             size={56}
@@ -237,7 +260,8 @@ export default function DashboardPage() {
                             fgColor="#ecf3ff"
                             level="M"
                           />
-                        </div>
+                          <span className="pointer-events-none absolute inset-0 rounded-lg bg-cyan-200/0 transition group-hover:bg-cyan-200/5" />
+                        </button>
                       </div>
                     </div>
 
@@ -251,15 +275,6 @@ export default function DashboardPage() {
                       >
                         Open
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSlug(link.id);
-                        }}
-                        className="rounded-full border border-slate-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
-                      >
-                        View analytics
-                      </button>
                     </div>
 
                     {link.recentSignals.length > 0 ? (
@@ -362,6 +377,54 @@ export default function DashboardPage() {
           </section>
         ) : null}
       </div>
+
+      {expandedQrLink ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/82 px-4 backdrop-blur-md"
+          onClick={() => {
+            setExpandedQrLink(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Large QR code for ${expandedQrLink.title}`}
+        >
+          <div
+            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-cyan-100/35 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.2),rgba(2,6,23,0.92)_48%)] p-6 shadow-[0_18px_80px_rgba(15,23,42,0.65)]"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setExpandedQrLink(null);
+              }}
+              className="absolute right-4 top-4 rounded-full border border-slate-200/35 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 transition hover:border-cyan-100/70 hover:bg-cyan-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+            >
+              Close
+            </button>
+
+            <p className="pr-20 text-xs uppercase tracking-[0.14em] text-cyan-100/75">Scan link</p>
+            <h3 className="mt-2 text-2xl text-slate-50">{expandedQrLink.title}</h3>
+
+            <div className="mt-5 rounded-2xl border border-slate-200/25 bg-slate-950/45 p-5">
+              <div className="mx-auto w-fit rounded-xl border border-slate-200/35 bg-white p-4 shadow-[0_0_30px_rgba(125,211,252,0.3)]">
+                <QRCodeSVG
+                  value={expandedQrLink.url}
+                  size={260}
+                  bgColor="#ffffff"
+                  fgColor="#0f172a"
+                  level="H"
+                  includeMargin
+                />
+              </div>
+            </div>
+
+            <p className="mt-4 break-all text-sm text-slate-100/90">{expandedQrLink.url}</p>
+            <p className="mt-2 text-xs text-slate-200/70">Tip: press Esc or tap outside to close.</p>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
