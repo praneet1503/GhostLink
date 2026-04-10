@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [links, setLinks] = useState<LinkSummary[]>([]);
   const [isLoadingLinks, setIsLoadingLinks] = useState(true);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
@@ -100,6 +101,44 @@ export default function DashboardPage() {
       setIsLoadingLinks(false);
     }
   }, []);
+
+  const handleDeleteLink = useCallback(
+    async (link: LinkSummary): Promise<void> => {
+      const confirmed = window.confirm(
+        `Delete ${link.title}? This removes the GhostLink from Vercel Blob permanently.`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setDeletingSlug(link.id);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetch(`/api/links?slug=${encodeURIComponent(link.id)}`, {
+          method: "DELETE",
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as { error?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to delete link.");
+        }
+
+        if (expandedQrLink?.id === link.id) {
+          closeExpandedQrModal();
+        }
+
+        await fetchLinks();
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to delete link.");
+      } finally {
+        setDeletingSlug(null);
+      }
+    },
+    [closeExpandedQrModal, expandedQrLink, fetchLinks],
+  );
 
   useEffect(() => {
     void fetchLinks();
@@ -229,14 +268,16 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/"
-              className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
             >
+              <i className="bi bi-house" aria-hidden="true" />
               Home
             </Link>
             <Link
               href="/create"
-              className="rounded-full bg-[color:var(--accent-cyan)] px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:-translate-y-0.5 hover:brightness-110"
+              className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-cyan)] px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:-translate-y-0.5 hover:brightness-110"
             >
+              <i className="bi bi-plus-lg" aria-hidden="true" />
               New link
             </Link>
           </div>
@@ -345,10 +386,24 @@ export default function DashboardPage() {
                       <CopyButton text={link.url} />
                       <Link
                         href={`/g/${link.id}`}
-                        className="rounded-full border border-slate-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
                       >
+                        <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
                         Open
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleDeleteLink(link);
+                        }}
+                        disabled={deletingSlug === link.id}
+                        className="inline-flex items-center gap-2 rounded-full border border-rose-300/35 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-100 transition hover:border-rose-200/70 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label={`Delete ${link.title}`}
+                        title="Delete link"
+                      >
+                        <i className="bi bi-trash" aria-hidden="true" />
+                        Delete
+                      </button>
                     </div>
 
                     {link.recentSignals.length > 0 ? (
@@ -417,8 +472,9 @@ export default function DashboardPage() {
                           </div>
                           <Link
                             href={analytics.highestPerformingLink.url}
-                            className="rounded-full border border-cyan-100/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-100/10"
+                                className="inline-flex items-center gap-2 rounded-full border border-cyan-100/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-100/10"
                           >
+                                <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
                             Open
                           </Link>
                         </div>
@@ -506,8 +562,9 @@ export default function DashboardPage() {
               ref={modalCloseButtonRef}
               type="button"
               onClick={closeExpandedQrModal}
-              className="absolute right-4 top-4 rounded-full border border-slate-200/35 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 transition hover:border-cyan-100/70 hover:bg-cyan-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+              className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full border border-slate-200/35 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 transition hover:border-cyan-100/70 hover:bg-cyan-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
             >
+              <i className="bi bi-x-lg" aria-hidden="true" />
               Close
             </button>
 

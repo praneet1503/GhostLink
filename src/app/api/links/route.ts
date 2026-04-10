@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listGhostLinks } from "@/lib/kv";
+import { deleteGhostLink, listGhostLinks } from "@/lib/kv";
 import type { LinkSummary, LinksResponse } from "@/types";
 
 const DEFAULT_LIMIT = 50;
@@ -62,4 +62,18 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     links: summaries,
   } satisfies LinksResponse);
+}
+
+export async function DELETE(request: NextRequest) {
+  const slug = request.nextUrl.searchParams.get("slug")?.trim();
+  if (!slug) {
+    return NextResponse.json({ error: "Missing slug query parameter." }, { status: 400 });
+  }
+
+  const deleted = await deleteGhostLink(slug);
+  if (!deleted) {
+    return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ deleted: true });
 }

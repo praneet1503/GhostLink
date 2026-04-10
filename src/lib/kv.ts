@@ -1,4 +1,4 @@
-import { get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
+import { del as blobDel, get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
 
 import type {
   BrowserSignals,
@@ -523,6 +523,28 @@ export async function getGhostLink(slug: string): Promise<GhostLink | null> {
   }
 
   return null;
+}
+
+export async function deleteGhostLink(slug: string): Promise<boolean> {
+  await hydrateIndex();
+
+  const existing = await getGhostLink(slug);
+
+  if (!existing) {
+    return false;
+  }
+
+  try {
+    await blobDel(blobPathForSlug(slug));
+  } catch (error) {
+    console.error("Blob delete failed", toErrorString(error));
+    throw error;
+  }
+
+  memoryStore.delete(slug);
+  memoryIndex.delete(slug);
+
+  return true;
 }
 
 export async function recordVisit(

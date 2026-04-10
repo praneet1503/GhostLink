@@ -78,9 +78,10 @@ export default function CopyButton({
       onClick={handleCopy}
       className={
         className ??
-        "rounded-full border border-cyan-200/40 bg-cyan-200/12 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20"
+        "inline-flex items-center gap-2 rounded-full border border-cyan-200/40 bg-cyan-200/12 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20"
       }
     >
+      <i className={`bi ${status === "copied" ? "bi-check2" : status === "failed" ? "bi-exclamation-circle" : "bi-clipboard"}`} aria-hidden="true" />
       {status === "copied"
         ? "Copied"
         : status === "failed"
