@@ -20,6 +20,38 @@ function formatCounterEntries(counter: Record<string, number>): Array<[string, n
   return Object.entries(counter).sort((a, b) => b[1] - a[1]);
 }
 
+function getDeviceSplit(devices: Record<string, number>): {
+  mobileCount: number;
+  laptopCount: number;
+  mobilePercent: number;
+  laptopPercent: number;
+  totalCount: number;
+} {
+  const mobileCount = devices.mobile ?? 0;
+  const laptopCount = (devices.tablet ?? 0) + (devices.desktop ?? 0);
+  const totalCount = mobileCount + laptopCount;
+
+  if (totalCount === 0) {
+    return {
+      mobileCount: 0,
+      laptopCount: 0,
+      mobilePercent: 0,
+      laptopPercent: 0,
+      totalCount: 0,
+    };
+  }
+
+  const mobilePercent = Math.round((mobileCount / totalCount) * 100);
+
+  return {
+    mobileCount,
+    laptopCount,
+    mobilePercent,
+    laptopPercent: 100 - mobilePercent,
+    totalCount,
+  };
+}
+
 export default function DashboardPage() {
   const [links, setLinks] = useState<LinkSummary[]>([]);
   const [isLoadingLinks, setIsLoadingLinks] = useState(true);
@@ -35,14 +67,6 @@ export default function DashboardPage() {
   const closeExpandedQrModal = useCallback(() => {
     setExpandedQrLink(null);
   }, []);
-
-  const selectedLink = useMemo(() => {
-    if (!selectedSlug) {
-      return null;
-    }
-
-    return links.find((link) => link.id === selectedSlug) ?? null;
-  }, [links, selectedSlug]);
 
   const fetchLinks = useCallback(async (): Promise<void> => {
     setIsLoadingLinks(true);
@@ -82,7 +106,7 @@ export default function DashboardPage() {
   }, [fetchLinks]);
 
   useEffect(() => {
-    if (!selectedSlug) {
+    if (links.length === 0) {
       setAnalytics(null);
       return;
     }
@@ -92,7 +116,7 @@ export default function DashboardPage() {
 
     const run = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/analytics?slug=${selectedSlug}`, {
+        const response = await fetch(`/api/analytics`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -121,7 +145,7 @@ export default function DashboardPage() {
     return () => {
       controller.abort();
     };
-  }, [selectedSlug]);
+  }, [links]);
 
   useEffect(() => {
     if (!expandedQrLink) {
@@ -186,16 +210,12 @@ export default function DashboardPage() {
     };
   }, [closeExpandedQrModal, expandedQrLink]);
 
-  const toneEntries = useMemo(() => {
-    return formatCounterEntries(analytics?.tones ?? {});
-  }, [analytics?.tones]);
-
   const referrerEntries = useMemo(() => {
     return formatCounterEntries(analytics?.referrers ?? {});
   }, [analytics?.referrers]);
 
-  const deviceEntries = useMemo(() => {
-    return formatCounterEntries(analytics?.devices ?? {});
+  const deviceSplit = useMemo(() => {
+    return getDeviceSplit(analytics?.devices ?? {});
   }, [analytics?.devices]);
 
   return (
@@ -354,11 +374,10 @@ export default function DashboardPage() {
               <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/72">
                 Analytics detail
               </p>
-              {selectedLink ? (
-                <h2 className="mt-3 text-3xl text-slate-50">{selectedLink.title}</h2>
-              ) : (
-                <h2 className="mt-3 text-3xl text-slate-50">Select a link</h2>
-              )}
+              <h2 className="mt-3 text-3xl text-slate-50">All links overview</h2>
+              <p className="mt-2 text-sm text-slate-200/70">
+                Aggregated from every GhostLink in your workspace.
+              </p>
 
               {isLoadingAnalytics ? (
                 <div className="mt-4 space-y-2">
@@ -382,18 +401,31 @@ export default function DashboardPage() {
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">Tone distribution</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {toneEntries.length > 0 ? (
-                        toneEntries.map(([label, count]) => (
-                          <span key={label} className="rounded-full border border-slate-200/25 px-3 py-1 text-xs uppercase tracking-[0.1em] text-slate-100/90">
-                            {label}: {count}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-slate-200/65">No tone data yet.</span>
-                      )}
-                    </div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">
+                      Highest performing link
+                    </p>
+                    {analytics.highestPerformingLink ? (
+                      <div className="mt-2 rounded-2xl border border-slate-200/20 bg-slate-950/35 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-lg text-slate-50">
+                              {analytics.highestPerformingLink.title}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-200/70">
+                              {analytics.highestPerformingLink.visits} views
+                            </p>
+                          </div>
+                          <Link
+                            href={analytics.highestPerformingLink.url}
+                            className="rounded-full border border-cyan-100/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-100/10"
+                          >
+                            Open
+                          </Link>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-200/65">No link data yet.</p>
+                    )}
                   </div>
 
                   <div>
@@ -412,18 +444,40 @@ export default function DashboardPage() {
                   </div>
 
                   <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">Devices</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {deviceEntries.length > 0 ? (
-                        deviceEntries.map(([label, count]) => (
-                          <span key={label} className="rounded-full border border-slate-200/25 px-3 py-1 text-xs uppercase tracking-[0.1em] text-slate-100/90">
-                            {label}: {count}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-slate-200/65">No device data yet.</span>
-                      )}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">Devices</p>
+                      {deviceSplit.totalCount > 0 ? (
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-200/60">
+                          {deviceSplit.totalCount} total
+                        </p>
+                      ) : null}
                     </div>
+                    {deviceSplit.totalCount > 0 ? (
+                      <>
+                        <div className="mt-3 flex items-center justify-between text-sm text-slate-100/85">
+                          <span>Mobile {deviceSplit.mobilePercent}%</span>
+                          <span>Laptop {deviceSplit.laptopPercent}%</span>
+                        </div>
+                        <div className="mt-3 h-3 overflow-hidden rounded-full border border-slate-200/15 bg-slate-950/50">
+                          <div className="flex h-full w-full">
+                            <div
+                              className="h-full bg-[color:var(--accent-cyan)]"
+                              style={{ width: `${deviceSplit.mobilePercent}%` }}
+                            />
+                            <div
+                              className="h-full bg-[color:var(--accent-gold)]"
+                              style={{ width: `${deviceSplit.laptopPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-xs uppercase tracking-[0.12em] text-slate-200/65">
+                          <span>{deviceSplit.mobileCount} mobile</span>
+                          <span>{deviceSplit.laptopCount} laptop</span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-200/65">No device data yet.</p>
+                    )}
                   </div>
                 </div>
               ) : null}

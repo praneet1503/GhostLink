@@ -147,6 +147,13 @@ export interface LinkSummary {
   recentSignals: SignalLog[];
 }
 
+export interface TopLinkPerformance {
+  id: string;
+  url: string;
+  title: string;
+  visits: number;
+}
+
 export interface LinksResponse {
   links: LinkSummary[];
 }
@@ -157,5 +164,6 @@ export interface AnalyticsResponse {
   tones: Record<string, number>;
   referrers: Record<string, number>;
   devices: Record<string, number>;
+  highestPerformingLink: TopLinkPerformance | null;
   recentSignals: SignalLog[];
 }
