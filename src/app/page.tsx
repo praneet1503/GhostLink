@@ -56,13 +56,6 @@ export default function Home() {
               <i className="bi bi-speedometer2" aria-hidden="true" />
               Dashboard
             </Link>
-            <Link
-              href="/create"
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-200/40 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-200/20 sm:text-sm"
-            >
-              <i className="bi bi-magic" aria-hidden="true" />
-              Launch Creator
-            </Link>
           </div>
         </header>
 
@@ -100,13 +93,6 @@ export default function Home() {
                 <i className="bi bi-rocket-takeoff" aria-hidden="true" />
                 Start Building
               </Link>
-              <a
-                href="#how-it-works"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-300/30 px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100/90 transition hover:border-slate-100/60 hover:bg-slate-100/10"
-              >
-                <i className="bi bi-info-circle" aria-hidden="true" />
-                How It Works
-              </a>
             </div>
           </div>
 

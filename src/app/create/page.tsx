@@ -9,8 +9,18 @@ import MessageRuleBuilder, {
   type DraftCondition,
   type DraftMessage,
 } from "@/components/MessageRuleBuilder";
+import {
+  getDefaultRuleSignal,
+  getDefaultValueForSignal,
+  isAllowedOperatorForSignal,
+  isAllowedValueForSignal,
+  normalizeOperatorForSignal,
+  parseConditionValueList,
+  stringifyConditionValueList,
+  type RuleSignalKey,
+} from "@/lib/ruleConditions";
 import { showToast } from "@/lib/toast";
-import type { ConditionOperator, CreateLinkResponse, SignalKey } from "@/types";
+import type { ConditionOperator, CreateLinkResponse } from "@/types";
 
 interface CreateFormState {
   title: string;
@@ -34,11 +44,14 @@ function createId(prefix: string): string {
 }
 
 function createDraftCondition(): DraftCondition {
+  const signal = getDefaultRuleSignal();
+  const operator = normalizeOperatorForSignal(signal, "equals");
+
   return {
     id: createId("condition"),
-    signal: "referrer",
-    operator: "equals",
-    value: "",
+    signal,
+    operator,
+    value: getDefaultValueForSignal(signal),
   };
 }
 
@@ -54,20 +67,18 @@ function createDraftMessage(): DraftMessage {
 }
 
 function toConditionPayload(condition: DraftCondition): {
-  signal: SignalKey;
+  signal: RuleSignalKey;
   operator: ConditionOperator;
   value: string | string[];
 } | null {
-  const normalizedValue = condition.value.trim();
-  if (!normalizedValue) {
+  if (!isAllowedOperatorForSignal(condition.signal, condition.operator)) {
     return null;
   }
 
   if (condition.operator === "oneOf") {
-    const values = normalizedValue
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
+    const values = parseConditionValueList(condition.value).filter((value) => {
+      return isAllowedValueForSignal(condition.signal, value);
+    });
 
     if (values.length === 0) {
       return null;
@@ -78,6 +89,11 @@ function toConditionPayload(condition: DraftCondition): {
       operator: condition.operator,
       value: values,
     };
+  }
+
+  const normalizedValue = condition.value.trim();
+  if (!normalizedValue || !isAllowedValueForSignal(condition.signal, normalizedValue)) {
+    return null;
   }
 
   return {
@@ -195,9 +211,42 @@ export default function CreatePage() {
         return {
           ...message,
           conditions: message.conditions.map((condition) => {
-            return condition.id === conditionId
-              ? { ...condition, ...patch }
-              : condition;
+            if (condition.id !== conditionId) {
+              return condition;
+            }
+
+            const nextSignal = patch.signal ?? condition.signal;
+            const nextOperator = normalizeOperatorForSignal(
+              nextSignal,
+              patch.operator ?? condition.operator,
+            );
+
+            let nextValue = patch.value ?? condition.value;
+
+            if (patch.signal) {
+              nextValue = getDefaultValueForSignal(nextSignal);
+            }
+
+            if (nextOperator === "oneOf") {
+              const nextValues = parseConditionValueList(nextValue).filter((value) => {
+                return isAllowedValueForSignal(nextSignal, value);
+              });
+
+              nextValue =
+                nextValues.length > 0
+                  ? stringifyConditionValueList(nextValues)
+                  : getDefaultValueForSignal(nextSignal);
+            } else if (!isAllowedValueForSignal(nextSignal, nextValue.trim())) {
+              nextValue = getDefaultValueForSignal(nextSignal);
+            }
+
+            return {
+              ...condition,
+              ...patch,
+              signal: nextSignal,
+              operator: nextOperator,
+              value: nextValue,
+            };
           }),
         };
       });
@@ -249,7 +298,7 @@ export default function CreatePage() {
                   (
                     condition,
                   ): condition is {
-                    signal: SignalKey;
+                    signal: RuleSignalKey;
                     operator: ConditionOperator;
                     value: string | string[];
                   } => Boolean(condition),

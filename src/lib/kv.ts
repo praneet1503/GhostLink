@@ -9,6 +9,13 @@ import type {
   SignalLog,
   Tone,
 } from "@/types";
+import {
+  isAllowedOperatorForSignal,
+  isAllowedValueForSignal,
+  isRuleSignalKey,
+  parseConditionValueList,
+  stringifyConditionValueList,
+} from "@/lib/ruleConditions";
 
 const BLOB_LINK_PREFIX = "ghostlink/links/";
 const BLOB_LINK_SUFFIX = ".json";
@@ -17,21 +24,6 @@ const EDGE_CONFIG_INDEX_KEY = "ghostlink-index";
 const EDGE_CONFIG_API_BASE = "https://api.vercel.com/v1/edge-config";
 const EDGE_CONFIG_READ_BASE = "https://edge-config.vercel.com";
 const MAX_SIGNAL_LOGS = 100;
-const SIGNAL_KEYS = new Set([
-  "timezone",
-  "language",
-  "deviceType",
-  "screenSize",
-  "timeOfDay",
-  "dayOfWeek",
-  "referrer",
-  "colorScheme",
-  "connectionSpeed",
-  "mouseSpeed",
-  "platform",
-]);
-const CONDITION_OPERATORS = new Set(["equals", "includes", "oneOf"]);
-
 type GhostLinkGlobal = {
   __ghostLinkMemoryStore__?: Map<string, GhostLink>;
   __ghostLinkMemoryIndex__?: Set<string>;
@@ -160,37 +152,40 @@ function sanitizeConditions(value: unknown): MessageCondition[] {
 
       const raw = item as Record<string, unknown>;
       const signal =
-        typeof raw.signal === "string" && SIGNAL_KEYS.has(raw.signal)
+        typeof raw.signal === "string" && isRuleSignalKey(raw.signal)
           ? raw.signal
           : null;
-      const operator =
-        typeof raw.operator === "string" && CONDITION_OPERATORS.has(raw.operator)
-          ? raw.operator
-          : null;
+      const operator = typeof raw.operator === "string" ? raw.operator : null;
 
       if (!signal || !operator) {
         return null;
       }
 
+      if (!isAllowedOperatorForSignal(signal, operator as MessageCondition["operator"])) {
+        return null;
+      }
+
       const rawValue = raw.value;
       if (operator === "oneOf") {
-        if (!Array.isArray(rawValue)) {
-          return null;
-        }
-
-        const values = rawValue
-          .filter((entry): entry is string => typeof entry === "string")
-          .map((entry) => entry.trim())
-          .filter((entry) => entry.length > 0);
+        const values = Array.isArray(rawValue)
+          ? rawValue
+              .filter((entry): entry is string => typeof entry === "string")
+              .map((entry) => entry.trim())
+              .filter((entry) => isAllowedValueForSignal(signal, entry))
+          : typeof rawValue === "string"
+            ? parseConditionValueList(rawValue).filter((entry) => {
+                return isAllowedValueForSignal(signal, entry);
+              })
+            : [];
 
         if (values.length === 0) {
           return null;
         }
 
         return {
-            signal: signal as MessageCondition["signal"],
-            operator: operator as MessageCondition["operator"],
-          value: values,
+          signal: signal as MessageCondition["signal"],
+          operator: operator as MessageCondition["operator"],
+          value: parseConditionValueList(stringifyConditionValueList(values)),
         };
       }
 
@@ -199,7 +194,7 @@ function sanitizeConditions(value: unknown): MessageCondition[] {
       }
 
       const normalized = rawValue.trim();
-      if (!normalized) {
+      if (!normalized || !isAllowedValueForSignal(signal, normalized)) {
         return null;
       }
 

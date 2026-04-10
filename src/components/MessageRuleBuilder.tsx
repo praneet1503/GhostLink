@@ -1,10 +1,17 @@
 "use client";
 
-import type { ConditionOperator, SignalKey } from "@/types";
+import {
+  getRuleSignalConfig,
+  parseConditionValueList,
+  RULE_SIGNAL_OPTIONS,
+  stringifyConditionValueList,
+  type RuleSignalKey,
+} from "@/lib/ruleConditions";
+import type { ConditionOperator } from "@/types";
 
 export interface DraftCondition {
   id: string;
-  signal: SignalKey;
+  signal: RuleSignalKey;
   operator: ConditionOperator;
   value: string;
 }
@@ -35,24 +42,9 @@ interface MessageRuleBuilderProps {
   onRemoveCondition: (messageId: string, conditionId: string) => void;
 }
 
-const SIGNAL_OPTIONS: Array<{ value: SignalKey; label: string }> = [
-  { value: "referrer", label: "Referrer" },
-  { value: "deviceType", label: "Device type" },
-  { value: "screenSize", label: "Screen size" },
-  { value: "platform", label: "Platform" },
-  { value: "timeOfDay", label: "Time of day" },
-  { value: "dayOfWeek", label: "Day of week" },
-  { value: "timezone", label: "Timezone" },
-  { value: "language", label: "Language" },
-  { value: "connectionSpeed", label: "Connection speed" },
-  { value: "mouseSpeed", label: "Mouse speed" },
-  { value: "colorScheme", label: "Color scheme" },
-];
-
 const OPERATOR_OPTIONS: Array<{ value: ConditionOperator; label: string }> = [
   { value: "equals", label: "equals" },
-  { value: "includes", label: "includes" },
-  { value: "oneOf", label: "one of (comma-separated)" },
+  { value: "oneOf", label: "one of" },
 ];
 
 export default function MessageRuleBuilder({
@@ -216,6 +208,17 @@ export default function MessageRuleBuilder({
 
               <div className="mt-3 grid gap-3">
                 {message.conditions.map((condition) => {
+                  const signalConfig = getRuleSignalConfig(condition.signal);
+                  if (!signalConfig) {
+                    return null;
+                  }
+
+                  const allowedOperators = OPERATOR_OPTIONS.filter((option) => {
+                    return signalConfig.operators.includes(option.value);
+                  });
+
+                  const selectedValues = parseConditionValueList(condition.value);
+
                   return (
                     <div
                       key={condition.id}
@@ -225,12 +228,12 @@ export default function MessageRuleBuilder({
                         value={condition.signal}
                         onChange={(event) =>
                           onUpdateCondition(message.id, condition.id, {
-                            signal: event.target.value as SignalKey,
+                            signal: event.target.value as RuleSignalKey,
                           })
                         }
                         className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
                       >
-                        {SIGNAL_OPTIONS.map((option) => (
+                        {RULE_SIGNAL_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -246,28 +249,51 @@ export default function MessageRuleBuilder({
                         }
                         className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
                       >
-                        {OPERATOR_OPTIONS.map((option) => (
+                        {allowedOperators.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
                         ))}
                       </select>
 
-                      <input
-                        value={condition.value}
-                        onChange={(event) =>
-                          onUpdateCondition(message.id, condition.id, {
-                            value: event.target.value,
-                          })
-                        }
-                        type="text"
-                        placeholder={
-                          condition.operator === "oneOf"
-                            ? "mobile, tablet"
-                            : "linkedin"
-                        }
-                        className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-3 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
-                      />
+                      {condition.operator === "oneOf" ? (
+                        <select
+                          multiple
+                          value={selectedValues}
+                          onChange={(event) => {
+                            const values = Array.from(event.target.selectedOptions, (option) => {
+                              return option.value;
+                            });
+
+                            onUpdateCondition(message.id, condition.id, {
+                              value: stringifyConditionValueList(values),
+                            });
+                          }}
+                          className="h-24 rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
+                        >
+                          {signalConfig.valueOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={condition.value}
+                          onChange={(event) =>
+                            onUpdateCondition(message.id, condition.id, {
+                              value: event.target.value,
+                            })
+                          }
+                          className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
+                        >
+                          {signalConfig.valueOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
 
                       <button
                         type="button"
