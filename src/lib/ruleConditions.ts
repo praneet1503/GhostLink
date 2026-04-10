@@ -7,16 +7,22 @@ export interface RuleValueOption {
   label: string;
 }
 
+export type RuleValueMode = "select" | "time";
+
 interface RuleSignalConfig {
   label: string;
   operators: ConditionOperator[];
-  valueOptions: RuleValueOption[];
+  valueMode: RuleValueMode;
+  valueOptions?: RuleValueOption[];
 }
+
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   referrer: {
     label: "Referrer",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "linkedin", label: "LinkedIn" },
       { value: "whatsapp", label: "WhatsApp" },
@@ -29,6 +35,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   deviceType: {
     label: "Device type",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "mobile", label: "Mobile" },
       { value: "tablet", label: "Tablet" },
@@ -38,6 +45,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   screenSize: {
     label: "Screen size",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "small", label: "Small" },
       { value: "medium", label: "Medium" },
@@ -47,6 +55,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   platform: {
     label: "Platform",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "windows", label: "Windows" },
       { value: "mac", label: "Mac" },
@@ -58,17 +67,13 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   },
   timeOfDay: {
     label: "Time of day",
-    operators: ["equals", "oneOf"],
-    valueOptions: [
-      { value: "morning", label: "Morning" },
-      { value: "afternoon", label: "Afternoon" },
-      { value: "evening", label: "Evening" },
-      { value: "night", label: "Night" },
-    ],
+    operators: ["equals"],
+    valueMode: "time",
   },
   dayOfWeek: {
     label: "Day of week",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "weekday", label: "Weekday" },
       { value: "weekend", label: "Weekend" },
@@ -77,6 +82,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   connectionSpeed: {
     label: "Connection speed",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "slow", label: "Slow" },
       { value: "fast", label: "Fast" },
@@ -86,6 +92,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   mouseSpeed: {
     label: "Mouse speed",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "slow", label: "Slow" },
       { value: "fast", label: "Fast" },
@@ -95,6 +102,7 @@ export const RULE_SIGNAL_CONFIG: Record<RuleSignalKey, RuleSignalConfig> = {
   colorScheme: {
     label: "Color scheme",
     operators: ["equals", "oneOf"],
+    valueMode: "select",
     valueOptions: [
       { value: "dark", label: "Dark" },
       { value: "light", label: "Light" },
@@ -147,7 +155,12 @@ export function stringifyConditionValueList(values: string[]): string {
 }
 
 export function getDefaultValueForSignal(signal: RuleSignalKey): string {
-  return RULE_SIGNAL_CONFIG[signal].valueOptions[0]?.value ?? "";
+  const config = RULE_SIGNAL_CONFIG[signal];
+  if (config.valueMode === "time") {
+    return "09:00";
+  }
+
+  return config.valueOptions?.[0]?.value ?? "";
 }
 
 export function isAllowedOperatorForSignal(
@@ -168,5 +181,57 @@ export function isAllowedValueForSignal(signal: SignalKey, value: string): boole
     return false;
   }
 
-  return config.valueOptions.some((option) => option.value === value);
+  if (config.valueMode === "time") {
+    return ["morning", "afternoon", "evening", "night"].includes(value);
+  }
+
+  return (config.valueOptions ?? []).some((option) => option.value === value);
+}
+
+export function isTimeInputSignal(signal: SignalKey): boolean {
+  const config = getRuleSignalConfig(signal);
+  return config?.valueMode === "time";
+}
+
+export function isValidTimeInput(value: string): boolean {
+  return TIME_24H_REGEX.test(value.trim());
+}
+
+function mapHourToTimeOfDay(hour: number): "morning" | "afternoon" | "evening" | "night" {
+  if (hour >= 5 && hour < 12) {
+    return "morning";
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return "afternoon";
+  }
+
+  if (hour >= 17 && hour < 22) {
+    return "evening";
+  }
+
+  return "night";
+}
+
+export function normalizeTimeConditionValue(signal: SignalKey, value: string): string | null {
+  if (!isTimeInputSignal(signal)) {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["morning", "afternoon", "evening", "night"].includes(normalized)) {
+    return normalized;
+  }
+
+  if (!isValidTimeInput(normalized)) {
+    return null;
+  }
+
+  const [hourText] = normalized.split(":");
+  const hour = Number.parseInt(hourText, 10);
+  if (!Number.isFinite(hour)) {
+    return null;
+  }
+
+  return mapHourToTimeOfDay(hour);
 }

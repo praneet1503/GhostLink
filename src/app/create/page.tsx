@@ -14,7 +14,9 @@ import {
   getDefaultValueForSignal,
   isAllowedOperatorForSignal,
   isAllowedValueForSignal,
+  isTimeInputSignal,
   normalizeOperatorForSignal,
+  normalizeTimeConditionValue,
   parseConditionValueList,
   stringifyConditionValueList,
   type RuleSignalKey,
@@ -77,7 +79,12 @@ function toConditionPayload(condition: DraftCondition): {
 
   if (condition.operator === "oneOf") {
     const values = parseConditionValueList(condition.value).filter((value) => {
-      return isAllowedValueForSignal(condition.signal, value);
+      const normalizedValue = normalizeTimeConditionValue(condition.signal, value);
+      return Boolean(
+        normalizedValue && isAllowedValueForSignal(condition.signal, normalizedValue),
+      );
+    }).map((value) => {
+      return normalizeTimeConditionValue(condition.signal, value) as string;
     });
 
     if (values.length === 0) {
@@ -91,7 +98,10 @@ function toConditionPayload(condition: DraftCondition): {
     };
   }
 
-  const normalizedValue = condition.value.trim();
+  const normalizedValue = normalizeTimeConditionValue(
+    condition.signal,
+    condition.value.trim(),
+  );
   if (!normalizedValue || !isAllowedValueForSignal(condition.signal, normalizedValue)) {
     return null;
   }
@@ -229,14 +239,20 @@ export default function CreatePage() {
 
             if (nextOperator === "oneOf") {
               const nextValues = parseConditionValueList(nextValue).filter((value) => {
-                return isAllowedValueForSignal(nextSignal, value);
+                const normalizedValue = normalizeTimeConditionValue(nextSignal, value);
+                return Boolean(
+                  normalizedValue && isAllowedValueForSignal(nextSignal, normalizedValue),
+                );
               });
 
               nextValue =
                 nextValues.length > 0
                   ? stringifyConditionValueList(nextValues)
                   : getDefaultValueForSignal(nextSignal);
-            } else if (!isAllowedValueForSignal(nextSignal, nextValue.trim())) {
+            } else if (
+              !isTimeInputSignal(nextSignal) &&
+              !isAllowedValueForSignal(nextSignal, nextValue.trim())
+            ) {
               nextValue = getDefaultValueForSignal(nextSignal);
             }
 

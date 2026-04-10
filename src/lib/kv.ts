@@ -13,6 +13,7 @@ import {
   isAllowedOperatorForSignal,
   isAllowedValueForSignal,
   isRuleSignalKey,
+  normalizeTimeConditionValue,
   parseConditionValueList,
   stringifyConditionValueList,
 } from "@/lib/ruleConditions";
@@ -171,11 +172,16 @@ function sanitizeConditions(value: unknown): MessageCondition[] {
           ? rawValue
               .filter((entry): entry is string => typeof entry === "string")
               .map((entry) => entry.trim())
-              .filter((entry) => isAllowedValueForSignal(signal, entry))
-          : typeof rawValue === "string"
-            ? parseConditionValueList(rawValue).filter((entry) => {
-                return isAllowedValueForSignal(signal, entry);
+              .map((entry) => normalizeTimeConditionValue(signal, entry))
+              .filter((entry): entry is string => {
+                return Boolean(entry && isAllowedValueForSignal(signal, entry));
               })
+          : typeof rawValue === "string"
+            ? parseConditionValueList(rawValue)
+                .map((entry) => normalizeTimeConditionValue(signal, entry))
+                .filter((entry): entry is string => {
+                  return Boolean(entry && isAllowedValueForSignal(signal, entry));
+                })
             : [];
 
         if (values.length === 0) {
@@ -193,7 +199,7 @@ function sanitizeConditions(value: unknown): MessageCondition[] {
         return null;
       }
 
-      const normalized = rawValue.trim();
+      const normalized = normalizeTimeConditionValue(signal, rawValue.trim());
       if (!normalized || !isAllowedValueForSignal(signal, normalized)) {
         return null;
       }

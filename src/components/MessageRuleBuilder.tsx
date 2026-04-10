@@ -2,6 +2,7 @@
 
 import {
   getRuleSignalConfig,
+  isTimeInputSignal,
   parseConditionValueList,
   RULE_SIGNAL_OPTIONS,
   stringifyConditionValueList,
@@ -218,6 +219,7 @@ export default function MessageRuleBuilder({
                   });
 
                   const selectedValues = parseConditionValueList(condition.value);
+                  const isTimeSignal = isTimeInputSignal(condition.signal);
 
                   return (
                     <div
@@ -256,7 +258,20 @@ export default function MessageRuleBuilder({
                         ))}
                       </select>
 
-                      {condition.operator === "oneOf" ? (
+                      {isTimeSignal ? (
+                        <input
+                          value={condition.value}
+                          onChange={(event) =>
+                            onUpdateCondition(message.id, condition.id, {
+                              value: event.target.value,
+                            })
+                          }
+                          type="time"
+                          step={60}
+                          inputMode="numeric"
+                          className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-3 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
+                        />
+                      ) : condition.operator === "oneOf" ? (
                         <select
                           multiple
                           value={selectedValues}
@@ -271,7 +286,7 @@ export default function MessageRuleBuilder({
                           }}
                           className="h-24 rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
                         >
-                          {signalConfig.valueOptions.map((option) => (
+                          {(signalConfig.valueOptions ?? []).map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -287,7 +302,7 @@ export default function MessageRuleBuilder({
                           }
                           className="rounded-lg border border-slate-300/25 bg-slate-900/75 px-2 py-2 text-sm text-slate-50 outline-none focus:border-cyan-200/70"
                         >
-                          {signalConfig.valueOptions.map((option) => (
+                          {(signalConfig.valueOptions ?? []).map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
