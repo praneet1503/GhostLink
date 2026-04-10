@@ -1,6 +1,6 @@
 # GhostLink
-> One link. Infinite Experinces. adaptive link experience for modern web.
-GhostLink is link generator that generates personalized content for each visitor all in one link.
+> One link. Infinite Experiences. Adaptive link experience for modern web.
+GhostLink is a link generator that generates personalized content for each visitor all in one link.
 
 
 **under construction 🚧🚧🚧**

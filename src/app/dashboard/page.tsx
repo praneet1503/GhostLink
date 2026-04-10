@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
@@ -28,6 +28,13 @@ export default function DashboardPage() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [expandedQrLink, setExpandedQrLink] = useState<LinkSummary | null>(null);
+  const modalCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modalContentRef = useRef<HTMLDivElement | null>(null);
+  const modalTriggerRef = useRef<HTMLElement | null>(null);
+
+  const closeExpandedQrModal = useCallback(() => {
+    setExpandedQrLink(null);
+  }, []);
 
   const selectedLink = useMemo(() => {
     if (!selectedSlug) {
@@ -121,17 +128,63 @@ export default function DashboardPage() {
       return;
     }
 
-    const handleEscape = (event: KeyboardEvent): void => {
+    modalTriggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    modalCloseButtonRef.current?.focus();
+
+    const handleKeydown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
-        setExpandedQrLink(null);
+        event.preventDefault();
+        closeExpandedQrModal();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const modal = modalContentRef.current;
+      if (!modal) {
+        return;
+      }
+
+      const focusableElements = modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey) {
+        if (activeElement === firstElement || !modal.contains(activeElement)) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+        return;
+      }
+
+      if (activeElement === lastElement || !modal.contains(activeElement)) {
+        event.preventDefault();
+        firstElement.focus();
       }
     };
 
-    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleKeydown);
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("keydown", handleKeydown);
+      document.body.style.overflow = previousBodyOverflow;
+      modalTriggerRef.current?.focus();
     };
-  }, [expandedQrLink]);
+  }, [closeExpandedQrModal, expandedQrLink]);
 
   const toneEntries = useMemo(() => {
     return formatCounterEntries(analytics?.tones ?? {});
@@ -247,7 +300,8 @@ export default function DashboardPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(event) => {
+                            modalTriggerRef.current = event.currentTarget;
                             setExpandedQrLink(link);
                           }}
                           className="group relative rounded-lg border border-slate-300/20 bg-slate-950/45 p-1 transition hover:-translate-y-0.5 hover:border-cyan-100/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
@@ -381,24 +435,23 @@ export default function DashboardPage() {
       {expandedQrLink ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/82 px-4 backdrop-blur-md"
-          onClick={() => {
-            setExpandedQrLink(null);
-          }}
+          onClick={closeExpandedQrModal}
           role="dialog"
           aria-modal="true"
           aria-label={`Large QR code for ${expandedQrLink.title}`}
         >
           <div
+            ref={modalContentRef}
+            tabIndex={-1}
             className="relative w-full max-w-md overflow-hidden rounded-3xl border border-cyan-100/35 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.2),rgba(2,6,23,0.92)_48%)] p-6 shadow-[0_18px_80px_rgba(15,23,42,0.65)]"
             onClick={(event) => {
               event.stopPropagation();
             }}
           >
             <button
+              ref={modalCloseButtonRef}
               type="button"
-              onClick={() => {
-                setExpandedQrLink(null);
-              }}
+              onClick={closeExpandedQrModal}
               className="absolute right-4 top-4 rounded-full border border-slate-200/35 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 transition hover:border-cyan-100/70 hover:bg-cyan-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
             >
               Close
