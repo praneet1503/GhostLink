@@ -7,12 +7,14 @@ import {
   buildHeuristicContent,
   inferPersonality,
 } from "@/lib/personalization";
+import { toStringValue } from "@/lib/requestValues";
 import {
   OpenRouterTimeoutError,
   hasOpenRouterApiKey,
   personalizeWithOpenRouter,
 } from "@/lib/openrouter";
-import type { BrowserSignals, ResolveResponse } from "@/types";
+import { parseSignalsWithDefaults } from "@/lib/signalValidation";
+import type { ResolveResponse } from "@/types";
 
 type ResolvePayloadInput = {
   slug?: unknown;
@@ -34,86 +36,6 @@ function deriveSlugFromReferer(referer: string | null): string {
   }
 }
 
-const allowedDeviceTypes = ["mobile", "tablet", "desktop"] as const;
-const allowedScreenSizes = ["small", "medium", "large"] as const;
-const allowedTimes = ["morning", "afternoon", "evening", "night"] as const;
-const allowedDays = ["weekday", "weekend"] as const;
-const allowedReferrers = [
-  "linkedin",
-  "whatsapp",
-  "twitter",
-  "github",
-  "direct",
-  "other",
-] as const;
-const allowedColorSchemes = ["dark", "light"] as const;
-const allowedSpeeds = ["slow", "fast", "unknown"] as const;
-const allowedMouseSpeeds = ["slow", "fast", "not_available"] as const;
-const allowedPlatforms = [
-  "windows",
-  "mac",
-  "linux",
-  "ios",
-  "android",
-  "other",
-] as const;
-
-function toStringValue(value: unknown, fallback: string): string {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
-  const normalized = value.trim();
-  return normalized || fallback;
-}
-
-function toEnum<T extends string>(
-  value: unknown,
-  allowed: readonly T[],
-  fallback: T,
-): T {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
-  const normalized = value.trim() as T;
-  return allowed.includes(normalized) ? normalized : fallback;
-}
-
-function parseSignals(input: unknown): BrowserSignals {
-  if (!input || typeof input !== "object") {
-    return {
-      timezone: "UTC",
-      language: "en-US",
-      deviceType: "desktop",
-      screenSize: "medium",
-      timeOfDay: "afternoon",
-      dayOfWeek: "weekday",
-      referrer: "other",
-      colorScheme: "light",
-      connectionSpeed: "unknown",
-      mouseSpeed: "not_available",
-      platform: "other",
-    };
-  }
-
-  const raw = input as Record<string, unknown>;
-
-  return {
-    timezone: toStringValue(raw.timezone, "UTC"),
-    language: toStringValue(raw.language, "en-US"),
-    deviceType: toEnum(raw.deviceType, allowedDeviceTypes, "desktop"),
-    screenSize: toEnum(raw.screenSize, allowedScreenSizes, "medium"),
-    timeOfDay: toEnum(raw.timeOfDay, allowedTimes, "afternoon"),
-    dayOfWeek: toEnum(raw.dayOfWeek, allowedDays, "weekday"),
-    referrer: toEnum(raw.referrer, allowedReferrers, "other"),
-    colorScheme: toEnum(raw.colorScheme, allowedColorSchemes, "light"),
-    connectionSpeed: toEnum(raw.connectionSpeed, allowedSpeeds, "unknown"),
-    mouseSpeed: toEnum(raw.mouseSpeed, allowedMouseSpeeds, "not_available"),
-    platform: toEnum(raw.platform, allowedPlatforms, "other"),
-  };
-}
-
 export async function POST(request: NextRequest) {
   let payload: ResolvePayloadInput = {};
 
@@ -133,7 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing slug." }, { status: 400 });
   }
 
-  const signals = parseSignals(payload.signals ?? payload.browserSignals);
+  const signals = parseSignalsWithDefaults(payload.signals ?? payload.browserSignals);
 
   const link = await getGhostLink(slug);
   if (!link) {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { UI_MESSAGES } from "@/lib/messages";
 import { showToast } from "@/lib/toast";
 
 interface CopyButtonProps {
@@ -47,22 +48,22 @@ export default function CopyButton({
 
       if (copied) {
         showToast({
-          title: "Link copied",
-          description: "URL copied to clipboard",
+          title: UI_MESSAGES.copySuccessTitle,
+          description: UI_MESSAGES.copySuccessDescription,
           kind: "success",
         });
       } else {
         showToast({
-          title: "Copy failed",
-          description: "Could not copy link",
+          title: UI_MESSAGES.copyFailedTitle,
+          description: UI_MESSAGES.copyFailedDescription,
           kind: "error",
         });
       }
     } catch {
       setStatus("failed");
       showToast({
-        title: "Copy failed",
-        description: "Could not copy link",
+        title: UI_MESSAGES.copyFailedTitle,
+        description: UI_MESSAGES.copyFailedDescription,
         kind: "error",
       });
     }
@@ -85,7 +86,7 @@ export default function CopyButton({
       {status === "copied"
         ? "Copied"
         : status === "failed"
-          ? "Copy failed"
+          ? "Could not copy"
           : label}
     </button>
   );

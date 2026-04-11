@@ -21,6 +21,7 @@ import {
   stringifyConditionValueList,
   type RuleSignalKey,
 } from "@/lib/ruleConditions";
+import { UI_MESSAGES } from "@/lib/messages";
 import { showToast } from "@/lib/toast";
 import type { ConditionOperator, CreateLinkResponse } from "@/types";
 
@@ -333,22 +334,20 @@ export default function CreatePage() {
 
       const data = (await response.json()) as CreateApiResponse;
       if (!response.ok || !data.slug || !data.url) {
-        throw new Error(data.error ?? "Could not create your GhostLink.");
+        throw new Error(data.error ?? UI_MESSAGES.createFailed);
       }
 
       setCreatedLink({ slug: data.slug, url: data.url });
       showToast({
-        title: "GhostLink created",
-        description: "Your adaptive URL is ready",
+        title: UI_MESSAGES.createSuccessToastTitle,
+        description: UI_MESSAGES.createSuccessToastDescription,
         kind: "success",
       });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not create your GhostLink.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : UI_MESSAGES.createFailed);
       showToast({
-        title: "Create failed",
-        description: "Please check your fields and retry",
+        title: UI_MESSAGES.createFailedToastTitle,
+        description: UI_MESSAGES.createFailedToastDescription,
         kind: "error",
       });
     } finally {
@@ -361,10 +360,10 @@ export default function CreatePage() {
       <main className="relative isolate min-h-screen overflow-hidden px-6 py-10 sm:px-8 lg:px-10">
         <div className="mx-auto w-full max-w-4xl rounded-3xl border border-slate-200/20 bg-slate-950/45 p-8 shadow-[0_24px_60px_rgba(3,8,20,0.4)] sm:p-10">
           <h1 className="mt-4 text-4xl text-slate-50 sm:text-5xl">
-            Your GhostLink is live.
+            Your link is ready.
           </h1>
           <p className="mt-4 text-base leading-relaxed text-slate-200/80">
-            Share this one URL and every visitor gets a context-aware experience.
+            Share one URL and each visitor sees a tailored version.
           </p>
 
           <div className="mt-7 rounded-2xl border border-cyan-100/20 bg-slate-900/45 p-5">
@@ -378,7 +377,7 @@ export default function CreatePage() {
                 href={`/g/${createdLink.slug}`}
                 className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
               >
-                Open preview
+                Open link
               </Link>
               <Link
                 href="/dashboard"
@@ -431,11 +430,8 @@ export default function CreatePage() {
         <p className="text-xs uppercase tracking-[0.2em] text-cyan-100/70">
           Create your GhostLink
         </p>
-        <h1 className="mt-4 text-4xl text-slate-50 sm:text-5xl">
-          One link. Context-driven messages.
-        </h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-200/80">
-          Choose single or multi-message mode.
+          Choose a simple message or a set of rules for multiple versions.
         </p>
 
         <div className="mt-6 inline-flex rounded-full border border-slate-200/25 bg-slate-950/45 p-1">
@@ -459,7 +455,7 @@ export default function CreatePage() {
                 : "text-slate-100 hover:bg-slate-100/10"
             }`}
           >
-            Multi-message rules
+            Multiple messages
           </button>
         </div>
 
@@ -468,7 +464,7 @@ export default function CreatePage() {
             <>
               <label className="grid gap-2">
                 <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                  Title of your content
+                  Message title
                 </span>
                 <input
                   value={form.title}
@@ -485,7 +481,7 @@ export default function CreatePage() {
 
               <label className="grid gap-2">
                 <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                  Main body / description
+                  Message body
                 </span>
                 <textarea
                   value={form.body}
@@ -503,7 +499,7 @@ export default function CreatePage() {
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                    Call to action text (optional)
+                    Button label (optional)
                   </span>
                   <input
                     value={form.cta}
@@ -519,7 +515,7 @@ export default function CreatePage() {
 
                 <label className="grid gap-2">
                   <span className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100/70">
-                    Call to action URL (optional)
+                    Button link (optional)
                   </span>
                   <input
                     value={form.ctaUrl}
@@ -560,7 +556,7 @@ export default function CreatePage() {
               disabled={!canSubmit || isSubmitting}
               className="rounded-full bg-[color:var(--accent-cyan)] px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? "Generating..." : "Generate GhostLink"}
+                {isSubmitting ? "Creating..." : "Create link"}
             </button>
             <Link
               href="/"

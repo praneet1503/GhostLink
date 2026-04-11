@@ -19,7 +19,7 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
   const [source, setSource] = useState<ResolveResponse["source"] | null>(null);
   const [matchType, setMatchType] = useState<ResolveResponse["matchType"]>(undefined);
 
-  const slugLooksValid = /^[a-z0-9-]{4,48}$/i.test(slug);
+  const isValidSlugFormat = /^[a-z0-9-]{4,48}$/i.test(slug);
 
   const handleResolved = useCallback((response: ResolveResponse) => {
     setContent(response.content);
@@ -38,12 +38,12 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
   }, []);
 
   const showNotFound =
-    !slugLooksValid ||
+    !isValidSlugFormat ||
     (errorMessage && /not found|unavailable|missing/i.test(errorMessage));
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden px-6 py-10 sm:px-8 lg:px-10">
-      {slugLooksValid ? (
+      {isValidSlugFormat ? (
         <SignalCollector
           slug={slug}
           onResolved={handleResolved}
@@ -59,10 +59,12 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
               👻
             </p>
             <h1 className="mt-4 text-4xl text-slate-50 sm:text-5xl">
-              Preparing your experience...
+              Loading your personalized page...
             </h1>
-            <p className="mt-4 text-base text-slate-200/80">Reading the room...</p>
-            <p className="mt-2 text-sm text-slate-200/65">Collecting passive signals, then tailoring your page.</p>
+            <p className="mt-4 text-base text-slate-200/80">
+              We are preparing the version most relevant to this visitor.
+            </p>
+            <p className="mt-2 text-sm text-slate-200/65">This usually takes a moment.</p>
               <div className="mx-auto mt-6 max-w-xl space-y-2">
                 <div className="skeleton-block h-4 w-2/3" />
                 <div className="skeleton-block h-4 w-full" />
@@ -75,11 +77,11 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
         {!isLoading && errorMessage ? (
           <section className="hero-panel reveal-up text-center">
             <h1 className="text-3xl text-slate-50 sm:text-4xl">
-              {showNotFound ? "Link not found" : "Link unavailable"}
+              {showNotFound ? "This link is unavailable" : "We could not load this page"}
             </h1>
             <p className="mt-4 text-base text-slate-200/80">
               {showNotFound
-                ? "This GhostLink does not exist or has expired."
+                ? "This link was not found or is no longer available."
                 : errorMessage}
             </p>
             <div className="mt-7">
@@ -101,7 +103,7 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
               </span>
               {source === "fallback" ? (
                 <span className="rounded-full border border-amber-200/35 bg-amber-900/20 px-3 py-1 text-amber-100/90">
-                  Served original content due to temporary AI delay
+                    Showing the original message while personalization finishes
                 </span>
               ) : null}
             </div>
@@ -111,7 +113,7 @@ export default function GhostLinkExperience({ slug }: GhostLinkExperienceProps) 
             {signals ? (
               <div className="rounded-2xl border border-slate-200/20 bg-slate-950/35 p-4 text-sm text-slate-200/75">
                 <p className="text-xs uppercase tracking-[0.14em] text-cyan-100/70">
-                  Signals captured
+                  Captured signals
                 </p>
                 <p className="mt-2">
                   {signals.deviceType} | {signals.timeOfDay} | {signals.referrer} |

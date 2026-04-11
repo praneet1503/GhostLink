@@ -103,32 +103,9 @@ export interface PersonalizedContent {
   tone: Tone;
 }
 
-export interface CreateLinkRequest {
-  messageMode?: MessageMode;
-  title?: string;
-  body?: string;
-  cta?: string;
-  ctaUrl?: string;
-  messages?: Array<{
-    id?: string;
-    title: string;
-    body: string;
-    cta?: string;
-    ctaUrl?: string;
-    conditions?: MessageCondition[];
-    priority?: number;
-  }>;
-  defaultMessageId?: string;
-}
-
 export interface CreateLinkResponse {
   slug: string;
   url: string;
-}
-
-export interface ResolveRequest {
-  slug: string;
-  signals: BrowserSignals;
 }
 
 export interface ResolveResponse {

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
+import { UI_MESSAGES } from "@/lib/messages";
 import type { AnalyticsResponse, LinkSummary, LinksResponse } from "@/types";
 
 function formatTimestamp(value: string): string {
@@ -58,7 +59,7 @@ export default function DashboardPage() {
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [expandedQrLink, setExpandedQrLink] = useState<LinkSummary | null>(null);
   const modalCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -80,13 +81,13 @@ export default function DashboardPage() {
       };
 
       if (!response.ok || !payload.links) {
-        throw new Error(payload.error ?? "Failed to fetch links.");
+        throw new Error(payload.error ?? UI_MESSAGES.fetchLinksFailed);
       }
 
       const fetchedLinks = payload.links;
 
       setLinks(fetchedLinks);
-      setSelectedSlug((current) => {
+      setSelectedLinkId((current) => {
         if (current && fetchedLinks.some((link) => link.id === current)) {
           return current;
         }
@@ -94,9 +95,11 @@ export default function DashboardPage() {
         return fetchedLinks[0]?.id ?? null;
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to fetch links.");
+      setErrorMessage(
+        error instanceof Error ? error.message : UI_MESSAGES.fetchLinksFailed,
+      );
       setLinks([]);
-      setSelectedSlug(null);
+      setSelectedLinkId(null);
     } finally {
       setIsLoadingLinks(false);
     }
@@ -104,9 +107,7 @@ export default function DashboardPage() {
 
   const handleDeleteLink = useCallback(
     async (link: LinkSummary): Promise<void> => {
-      const confirmed = window.confirm(
-        `Delete ${link.title}? This removes the GhostLink from Vercel Blob permanently.`,
-      );
+      const confirmed = window.confirm(UI_MESSAGES.deleteConfirm(link.title));
 
       if (!confirmed) {
         return;
@@ -123,7 +124,7 @@ export default function DashboardPage() {
         const payload = (await response.json()) as { error?: string };
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to delete link.");
+          throw new Error(payload.error ?? UI_MESSAGES.deleteLinkFailed);
         }
 
         if (expandedQrLink?.id === link.id) {
@@ -132,7 +133,9 @@ export default function DashboardPage() {
 
         await fetchLinks();
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to delete link.");
+        setErrorMessage(
+          error instanceof Error ? error.message : UI_MESSAGES.deleteLinkFailed,
+        );
       } finally {
         setDeletingSlug(null);
       }
@@ -262,8 +265,7 @@ export default function DashboardPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            
-            <h1 className="mt-2 text-4xl text-slate-50 sm:text-5xl">Your GhostLinks</h1>
+            <h1 className="mt-2 text-4xl text-slate-50 sm:text-5xl">Your links</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -320,7 +322,7 @@ export default function DashboardPage() {
           <section className="hero-panel">
             <h2 className="text-3xl text-slate-50">No links yet</h2>
             <p className="mt-3 text-base text-slate-200/80">
-              Create your first GhostLink.
+              Create your first link.
             </p>
             <div className="mt-6">
               <Link
@@ -337,7 +339,7 @@ export default function DashboardPage() {
           <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-4">
               {links.map((link) => {
-                const isActive = selectedSlug === link.id;
+                const isActive = selectedLinkId === link.id;
 
                 return (
                   <article
@@ -431,9 +433,9 @@ export default function DashboardPage() {
               <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/72">
                 Analytics detail
               </p>
-              <h2 className="mt-3 text-3xl text-slate-50">All links overview</h2>
+              <h2 className="mt-3 text-3xl text-slate-50">Workspace overview</h2>
               <p className="mt-2 text-sm text-slate-200/70">
-                Aggregated from every GhostLink in your workspace.
+                A quick summary of how your links are performing.
               </p>
 
               {isLoadingAnalytics ? (

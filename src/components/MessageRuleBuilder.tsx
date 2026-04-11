@@ -94,7 +94,7 @@ export default function MessageRuleBuilder({
                   disabled={index === 0}
                   className="rounded-full border border-slate-200/25 px-3 py-1 text-xs uppercase tracking-[0.12em] text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Up
+                  Move up
                 </button>
                 <button
                   type="button"
@@ -102,14 +102,14 @@ export default function MessageRuleBuilder({
                   disabled={index === messages.length - 1}
                   className="rounded-full border border-slate-200/25 px-3 py-1 text-xs uppercase tracking-[0.12em] text-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Down
+                  Move down
                 </button>
                 <button
                   type="button"
                   onClick={() => onSetDefaultMessage(message.id)}
                   className="rounded-full border border-emerald-200/30 bg-emerald-900/20 px-3 py-1 text-xs uppercase tracking-[0.12em] text-emerald-100"
                 >
-                  {isDefault ? "Default" : "Set default"}
+                  {isDefault ? "Default" : "Make default"}
                 </button>
                 <button
                   type="button"
@@ -158,7 +158,7 @@ export default function MessageRuleBuilder({
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-xs uppercase tracking-[0.12em] text-cyan-100/70">
-                    CTA text (optional)
+                    Button label (optional)
                   </span>
                   <input
                     value={message.cta}
@@ -173,7 +173,7 @@ export default function MessageRuleBuilder({
 
                 <label className="grid gap-2">
                   <span className="text-xs uppercase tracking-[0.12em] text-cyan-100/70">
-                    CTA URL (optional)
+                    Button link (optional)
                   </span>
                   <input
                     value={message.ctaUrl}
@@ -190,7 +190,7 @@ export default function MessageRuleBuilder({
             <div className="mt-5 rounded-xl border border-slate-200/20 bg-slate-950/45 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs uppercase tracking-[0.12em] text-cyan-100/70">
-                  Rule conditions (all must match)
+                  Conditions (all must match)
                 </p>
                 <button
                   type="button"
