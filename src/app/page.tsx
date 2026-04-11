@@ -63,8 +63,8 @@ export default function Home() {
               style={{ animationDelay: "240ms" }}
             >
               Build one GhostLink and let passive browser context adapt your
-              message for each visitor. Recruiters see polish, friends see
-              personality, developers see depth.
+              message for each visitor. Recruiters see polish resumes, friends see
+              personal stories, developers see repos and founders see traction. No more one-size-fits-all links.
             </p>
 
             <div

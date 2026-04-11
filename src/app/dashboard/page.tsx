@@ -386,6 +386,8 @@ export default function DashboardPage() {
                       <CopyButton text={link.url} />
                       <Link
                         href={`/g/${link.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 rounded-full border border-slate-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
                       >
                         <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
@@ -472,9 +474,11 @@ export default function DashboardPage() {
                           </div>
                           <Link
                             href={analytics.highestPerformingLink.url}
-                                className="inline-flex items-center gap-2 rounded-full border border-cyan-100/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-100/10"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-full border border-cyan-100/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-50 transition hover:border-cyan-100/70 hover:bg-cyan-100/10"
                           >
-                                <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
+                            <i className="bi bi-box-arrow-up-right" aria-hidden="true" />
                             Open
                           </Link>
                         </div>
