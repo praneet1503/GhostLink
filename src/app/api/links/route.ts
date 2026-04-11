@@ -70,10 +70,18 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Missing slug query parameter." }, { status: 400 });
   }
 
-  const deleted = await deleteGhostLink(slug);
-  if (!deleted) {
-    return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
-  }
+  try {
+    const deleted = await deleteGhostLink(slug);
+    if (!deleted) {
+      return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
+    }
 
-  return NextResponse.json({ deleted: true });
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete failed:", error);
+    return NextResponse.json(
+      { error: "Failed to delete link. Please try again." },
+      { status: 500 },
+    );
+  }
 }

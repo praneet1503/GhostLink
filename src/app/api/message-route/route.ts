@@ -10,8 +10,6 @@ type MessageRoutePayloadInput = {
   slug?: unknown;
   signals?: unknown;
 };
-// Retained for backward compatibility with potential external clients.
-// Prefer /api/resolve for new integrations.
 
 export async function POST(request: NextRequest) {
   let payload: MessageRoutePayloadInput;

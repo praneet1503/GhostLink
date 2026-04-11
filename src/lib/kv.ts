@@ -360,9 +360,6 @@ async function readEdgeConfigIndex(): Promise<string[] | null> {
 }
 
 async function writeEdgeConfigIndex(slugs: string[]): Promise<void> {
-  // Write operations via Edge Config REST API require a Vercel API token.
-  // The project is configured to operate without this by relying on Blob and
-  // in-memory indices. This function is intentionally a no-op in that case.
   return;
 }
 
@@ -428,8 +425,6 @@ async function addSlugToIndex(slug: string): Promise<void> {
   await hydrateIndex();
   memoryIndex.add(slug);
 
-  // Edge Config writes are disabled in the no-API-token configuration.
-  // Blob-based listing remains the primary index source.
   await writeEdgeConfigIndex(Array.from(memoryIndex));
 }
 
@@ -535,15 +530,20 @@ export async function deleteGhostLink(slug: string): Promise<boolean> {
     return false;
   }
 
+  let blobDeleteError: Error | null = null;
   try {
     await blobDel(blobPathForSlug(slug));
   } catch (error) {
     console.error("Blob delete failed", toErrorString(error));
-    throw error;
+    blobDeleteError = error instanceof Error ? error : new Error(toErrorString(error));
   }
 
   memoryStore.delete(slug);
   memoryIndex.delete(slug);
+
+  if (blobDeleteError) {
+    throw blobDeleteError;
+  }
 
   return true;
 }
