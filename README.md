@@ -1,8 +1,4 @@
-# GhostLink
-> One link. Infinite Experiences. Adaptive link experience for modern web.
-GhostLink is a link generator that generates personalized content for each visitor all in one link.
-
-## Why GhostLink?
+# GhostLink?
 GhostLink uses adaptive rules to deliver personalized content to each visitor. Whether you're a job seeker, entrepreneur, or content creator, GhostLink helps you create a single link that adapts to your audience, showcasing the most relevant information to each visitor.
 
 ## Features
@@ -22,9 +18,11 @@ GhostLink uses adaptive rules to deliver personalized content to each visitor. W
 4. ```zsh
     npm run dev
    ```
-5. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
 
 ## Contributing
-- Contributions are welcome! Please fork the repository and submit a pull request with your changes and i will review it as soon as possible.     
+- contribute as much as you like   
+- fork the repo
+- do ur changes eh?
+- and send up a pull request
 
