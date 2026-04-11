@@ -198,23 +198,43 @@ h3 {
 
 @keyframes persona-scroll {
   0%,
-  16% {
+  8% {
     transform: translateY(0);
   }
-  25%,
-  41% {
+  11%,
+  19% {
     transform: translateY(-2.7rem);
   }
-  50%,
-  66% {
+  22%,
+  30% {
     transform: translateY(-5.4rem);
   }
-  75%,
-  91% {
+  33%,
+  41% {
     transform: translateY(-8.1rem);
   }
+  44%,
+  52% {
+    transform: translateY(-10.8rem);
+  }
+  55%,
+  63% {
+    transform: translateY(-13.5rem);
+  }
+  66%,
+  74% {
+    transform: translateY(-16.2rem);
+  }
+  77%,
+  85% {
+    transform: translateY(-18.9rem);
+  }
+  88%,
+  96% {
+    transform: translateY(-21.6rem);
+  }
   100% {
-    transform: translateY(0);
+    transform: translateY(-24.3rem);
   }
 }
 

@@ -320,7 +320,7 @@ export default function DashboardPage() {
           <section className="hero-panel">
             <h2 className="text-3xl text-slate-50">No links yet</h2>
             <p className="mt-3 text-base text-slate-200/80">
-              Create your first GhostLink to start collecting adaptive delivery analytics.
+              Create your first GhostLink.
             </p>
             <div className="mt-6">
               <Link

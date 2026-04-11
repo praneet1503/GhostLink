@@ -360,9 +360,6 @@ export default function CreatePage() {
     return (
       <main className="relative isolate min-h-screen overflow-hidden px-6 py-10 sm:px-8 lg:px-10">
         <div className="mx-auto w-full max-w-4xl rounded-3xl border border-slate-200/20 bg-slate-950/45 p-8 shadow-[0_24px_60px_rgba(3,8,20,0.4)] sm:p-10">
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-100/70">
-            Phase 2 complete
-          </p>
           <h1 className="mt-4 text-4xl text-slate-50 sm:text-5xl">
             Your GhostLink is live.
           </h1>
@@ -405,8 +402,7 @@ export default function CreatePage() {
             </div>
             <div className="max-w-sm">
               <p className="text-sm leading-relaxed text-slate-200/80">
-                Scan this QR code from another device to demo how the exact same
-                GhostLink can adapt its delivery style.
+                Scan to open this link on another device.
               </p>
               <button
                 type="button"
@@ -439,7 +435,7 @@ export default function CreatePage() {
           One link. Context-driven messages.
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-200/80">
-          Choose simple mode for one message, or define multiple messages with signal rules.
+          Choose single or multi-message mode.
         </p>
 
         <div className="mt-6 inline-flex rounded-full border border-slate-200/25 bg-slate-950/45 p-1">
