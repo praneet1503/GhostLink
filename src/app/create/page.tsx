@@ -385,6 +385,8 @@ export default function CreatePage() {
               <CopyButton text={createdLink.url} />
               <Link
                 href={`/g/${createdLink.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
               >
                 Open link
