@@ -1,27 +1,46 @@
 import { createGhostLinkUserId, normalizeGhostLinkUserId } from "@/lib/ownership";
 
 const LOCAL_USER_ID_KEY = "ghostlink_userid";
-const LOCAL_LINKS_KEY = "ghostlink_mylinks";
-const SLUG_PATTERN = /^[a-z0-9-]{3,64}$/;
+const LOCAL_OWNED_LINKS_KEY = "my_links";
+const LINK_ID_PATTERN = /^[a-z0-9-]{3,64}$/;
+const MIN_SECRET_LENGTH = 32;
+
+export type OwnedLinkRecord = {
+  linkId: string;
+  secret: string;
+};
 
 function canUseLocalStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-function normalizeSlug(value: unknown): string | null {
+function normalizeLinkId(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
   const normalized = value.trim().toLowerCase();
-  if (!SLUG_PATTERN.test(normalized)) {
+  if (!LINK_ID_PATTERN.test(normalized)) {
     return null;
   }
 
   return normalized;
 }
 
-function parseSlugArray(rawValue: string | null): string[] {
+function normalizeSecret(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < MIN_SECRET_LENGTH) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function parseOwnedLinkArray(rawValue: string | null): OwnedLinkRecord[] {
   if (!rawValue) {
     return [];
   }
@@ -32,24 +51,38 @@ function parseSlugArray(rawValue: string | null): string[] {
       return [];
     }
 
-    return Array.from(
-      new Set(
-        parsed
-          .map((value) => normalizeSlug(value))
-          .filter((value): value is string => Boolean(value)),
-      ),
-    );
+    const uniqueRecords = new Map<string, string>();
+
+    parsed.forEach((value) => {
+      if (!value || typeof value !== "object") {
+        return;
+      }
+
+      const rawRecord = value as Record<string, unknown>;
+      const linkId = normalizeLinkId(rawRecord.linkId);
+      const secret = normalizeSecret(rawRecord.secret);
+
+      if (!linkId || !secret) {
+        return;
+      }
+
+      uniqueRecords.set(linkId, secret);
+    });
+
+    return Array.from(uniqueRecords.entries()).map(([linkId, secret]) => {
+      return { linkId, secret };
+    });
   } catch {
     return [];
   }
 }
 
-function storeSlugArray(slugs: string[]): void {
+function storeOwnedLinkArray(records: OwnedLinkRecord[]): void {
   if (!canUseLocalStorage()) {
     return;
   }
 
-  window.localStorage.setItem(LOCAL_LINKS_KEY, JSON.stringify(slugs));
+  window.localStorage.setItem(LOCAL_OWNED_LINKS_KEY, JSON.stringify(records));
 }
 
 export function getOrCreateGhostLinkUserId(): string {
@@ -73,43 +106,81 @@ export function getStoredGhostLinkSlugs(): string[] {
     return [];
   }
 
-  return parseSlugArray(window.localStorage.getItem(LOCAL_LINKS_KEY));
+  return getOwnedLinkRecords().map((record) => record.linkId);
 }
 
-export function addStoredGhostLinkSlug(slug: string): void {
+export function getOwnedLinkRecords(): OwnedLinkRecord[] {
+  if (!canUseLocalStorage()) {
+    return [];
+  }
+
+  return parseOwnedLinkArray(window.localStorage.getItem(LOCAL_OWNED_LINKS_KEY));
+}
+
+export function getOwnedLinkSecretMap(): Record<string, string> {
+  return getOwnedLinkRecords().reduce<Record<string, string>>((acc, record) => {
+    acc[record.linkId] = record.secret;
+    return acc;
+  }, {});
+}
+
+export function addOwnedLinkRecord(linkId: string, secret: string): void {
   if (!canUseLocalStorage()) {
     return;
   }
 
-  const normalizedSlug = normalizeSlug(slug);
-  if (!normalizedSlug) {
+  const normalizedLinkId = normalizeLinkId(linkId);
+  const normalizedSecret = normalizeSecret(secret);
+  if (!normalizedLinkId || !normalizedSecret) {
     return;
   }
 
-  const existing = getStoredGhostLinkSlugs();
-  if (existing.includes(normalizedSlug)) {
-    return;
-  }
+  const existingMap = getOwnedLinkSecretMap();
+  existingMap[normalizedLinkId] = normalizedSecret;
+  const updated = Object.entries(existingMap).map(([nextLinkId, nextSecret]) => {
+    return {
+      linkId: nextLinkId,
+      secret: nextSecret,
+    };
+  });
 
-  storeSlugArray([...existing, normalizedSlug]);
+  storeOwnedLinkArray(updated);
 }
 
-export function removeStoredGhostLinkSlug(slug: string): void {
+export function removeOwnedLinkRecord(linkId: string): void {
   if (!canUseLocalStorage()) {
     return;
   }
 
-  const normalizedSlug = normalizeSlug(slug);
-  if (!normalizedSlug) {
+  const normalizedLinkId = normalizeLinkId(linkId);
+  if (!normalizedLinkId) {
     return;
   }
 
-  const existing = getStoredGhostLinkSlugs();
-  const next = existing.filter((entry) => entry !== normalizedSlug);
+  const existing = getOwnedLinkRecords();
+  const next = existing.filter((entry) => entry.linkId !== normalizedLinkId);
 
   if (next.length === existing.length) {
     return;
   }
 
-  storeSlugArray(next);
+  storeOwnedLinkArray(next);
+}
+
+export function getOwnedLinkSecret(linkId: string): string | null {
+  const normalizedLinkId = normalizeLinkId(linkId);
+  if (!normalizedLinkId) {
+    return null;
+  }
+
+  return getOwnedLinkSecretMap()[normalizedLinkId] ?? null;
+}
+
+// Backward-compatible aliases for callers updated in this patch.
+export function addStoredGhostLinkSlug(linkId: string, secret: string): void {
+  addOwnedLinkRecord(linkId, secret);
+}
+
+export function removeStoredGhostLinkSlug(linkId: string): void {
+  removeOwnedLinkRecord(linkId);
 }

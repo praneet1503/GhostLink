@@ -85,6 +85,7 @@ export interface SignalLog {
 
 export interface GhostLink {
   id: string;
+  secret?: string;
   createdBy?: string;
   createdAt: string;
   originalContent: OriginalContent;
@@ -105,7 +106,8 @@ export interface PersonalizedContent {
 }
 
 export interface CreateLinkResponse {
-  slug: string;
+  id: string;
+  secret: string;
   url: string;
 }
 

@@ -10,7 +10,7 @@ import MessageRuleBuilder, {
   type DraftMessage,
 } from "@/components/MessageRuleBuilder";
 import {
-  addStoredGhostLinkSlug,
+  addOwnedLinkRecord,
   getOrCreateGhostLinkUserId,
 } from "@/lib/localStorageManager";
 import { UI_MESSAGES } from "@/lib/messages";
@@ -120,7 +120,7 @@ function toConditionPayload(condition: DraftCondition): {
 }
 
 export default function CreatePage() {
-  const [mode, setMode] = useState<CreateMode>("single");
+  const [mode, setMode] = useState<CreateMode>("multi");
   const [form, setForm] = useState<CreateFormState>({
     title: "",
     body: "",
@@ -342,12 +342,12 @@ export default function CreatePage() {
       });
 
       const data = (await response.json()) as CreateApiResponse;
-      if (!response.ok || !data.slug || !data.url) {
+      if (!response.ok || !data.id || !data.secret || !data.url) {
         throw new Error(data.error ?? UI_MESSAGES.createFailed);
       }
 
-      setCreatedLink({ slug: data.slug, url: data.url });
-      addStoredGhostLinkSlug(data.slug);
+      setCreatedLink({ id: data.id, secret: data.secret, url: data.url });
+      addOwnedLinkRecord(data.id, data.secret);
       showToast({
         title: UI_MESSAGES.createSuccessToastTitle,
         description: UI_MESSAGES.createSuccessToastDescription,
@@ -384,7 +384,7 @@ export default function CreatePage() {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <CopyButton text={createdLink.url} />
               <Link
-                href={`/g/${createdLink.slug}`}
+                href={`/g/${createdLink.id}`}
                 className="rounded-full border border-slate-300/30 px-5 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 transition hover:border-slate-100/60 hover:bg-slate-100/10"
               >
                 Open link
@@ -417,7 +417,7 @@ export default function CreatePage() {
                 type="button"
                 onClick={() => {
                   setCreatedLink(null);
-                  setMode("single");
+                  setMode("multi");
                   setForm({ title: "", body: "", cta: "", ctaUrl: "" });
                   const firstMessage = createDraftMessage();
                   setMultiMessages([firstMessage]);
@@ -570,9 +570,9 @@ export default function CreatePage() {
             </button>
             <Link
               href="/"
-              className="rounded-full border border-slate-300/30 px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100/90 transition hover:border-slate-100/60 hover:bg-slate-100/10"
+              className="rounded-full border border-slate-300/30 px-6 py-3 text-sm font-semibold tracking-[0.12em] text-slate-100/90 transition hover:border-slate-100/60 hover:bg-slate-100/10"
             >
-              Back to landing
+              back
             </Link>
           </div>
 

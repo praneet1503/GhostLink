@@ -6,9 +6,9 @@ import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
 import {
+  getOwnedLinkSecretMap,
   getOrCreateGhostLinkUserId,
-  getStoredGhostLinkSlugs,
-  removeStoredGhostLinkSlug,
+  removeOwnedLinkRecord,
 } from "@/lib/localStorageManager";
 import { UI_MESSAGES } from "@/lib/messages";
 import { GHOSTLINK_USER_HEADER } from "@/lib/ownership";
@@ -70,6 +70,7 @@ export default function DashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [ownedSecretMap, setOwnedSecretMap] = useState<Record<string, string>>({});
   const [expandedQrLink, setExpandedQrLink] = useState<LinkSummary | null>(null);
   const modalCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const modalContentRef = useRef<HTMLDivElement | null>(null);
@@ -86,9 +87,6 @@ export default function DashboardPage() {
     try {
       const response = await fetch("/api/links?limit=100", {
         cache: "no-store",
-        headers: {
-          [GHOSTLINK_USER_HEADER]: userId,
-        },
       });
       const payload = (await response.json()) as Partial<LinksResponse> & {
         error?: string;
@@ -99,21 +97,25 @@ export default function DashboardPage() {
       }
 
       const serverLinks = payload.links;
-      const savedSlugs = getStoredGhostLinkSlugs();
-      const savedSlugSet = new Set(savedSlugs);
+      const storedSecretMap = getOwnedLinkSecretMap();
+      const storedLinkIds = Object.keys(storedSecretMap);
 
       // Keep localStorage clean when links were deleted on the server.
       const serverSlugSet = new Set(serverLinks.map((link) => link.id));
-      savedSlugs.forEach((savedSlug) => {
-        if (!serverSlugSet.has(savedSlug)) {
-          removeStoredGhostLinkSlug(savedSlug);
+      storedLinkIds.forEach((storedLinkId) => {
+        if (!serverSlugSet.has(storedLinkId)) {
+          removeOwnedLinkRecord(storedLinkId);
         }
       });
+
+      const nextOwnedSecretMap = getOwnedLinkSecretMap();
+      const savedSlugSet = new Set(Object.keys(nextOwnedSecretMap));
 
       const fetchedLinks = serverLinks.filter((link) => {
         return savedSlugSet.has(link.id);
       });
 
+      setOwnedSecretMap(nextOwnedSecretMap);
       setLinks(fetchedLinks);
       setSelectedLinkId((current) => {
         if (current && fetchedLinks.some((link) => link.id === current)) {
@@ -131,7 +133,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingLinks(false);
     }
-  }, [userId]);
+  }, []);
 
   const handleDeleteLink = useCallback(
     async (link: LinkSummary): Promise<void> => {
@@ -145,12 +147,18 @@ export default function DashboardPage() {
       setErrorMessage(null);
 
       try {
-        const response = await fetch(`/api/links?slug=${encodeURIComponent(link.id)}`, {
+        const ownedSecret = ownedSecretMap[link.id];
+        if (!ownedSecret) {
+          throw new Error("This browser does not own this link.");
+        }
+
+        const response = await fetch("/api/links", {
           method: "DELETE",
           cache: "no-store",
           headers: {
-            [GHOSTLINK_USER_HEADER]: userId,
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify({ id: link.id, secret: ownedSecret }),
         });
         const payload = (await response.json()) as { error?: string };
 
@@ -162,7 +170,12 @@ export default function DashboardPage() {
           closeExpandedQrModal();
         }
 
-        removeStoredGhostLinkSlug(link.id);
+        removeOwnedLinkRecord(link.id);
+        setOwnedSecretMap((current) => {
+          const next = { ...current };
+          delete next[link.id];
+          return next;
+        });
 
         await fetchLinks();
       } catch (error) {
@@ -173,7 +186,7 @@ export default function DashboardPage() {
         setDeletingSlug(null);
       }
     },
-    [closeExpandedQrModal, expandedQrLink, fetchLinks, userId],
+    [closeExpandedQrModal, expandedQrLink, fetchLinks, ownedSecretMap],
   );
 
   useEffect(() => {
@@ -380,6 +393,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {links.map((link) => {
                 const isActive = selectedLinkId === link.id;
+                const hasOwnershipSecret = Boolean(ownedSecretMap[link.id]);
 
                 return (
                   <article
@@ -440,10 +454,14 @@ export default function DashboardPage() {
                         onClick={() => {
                           void handleDeleteLink(link);
                         }}
-                        disabled={deletingSlug === link.id}
+                        disabled={deletingSlug === link.id || !hasOwnershipSecret}
                         className="inline-flex items-center gap-2 rounded-full border border-rose-300/35 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-100 transition hover:border-rose-200/70 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                         aria-label={`Delete ${link.title}`}
-                        title="Delete link"
+                        title={
+                          hasOwnershipSecret
+                            ? "Delete link"
+                            : "Ownership secret missing for this link"
+                        }
                       >
                         <i className="bi bi-trash" aria-hidden="true" />
                         Delete

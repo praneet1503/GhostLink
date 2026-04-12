@@ -26,6 +26,7 @@ const EDGE_CONFIG_INDEX_KEY = "ghostlink-index";
 const EDGE_CONFIG_API_BASE = "https://api.vercel.com/v1/edge-config";
 const EDGE_CONFIG_READ_BASE = "https://edge-config.vercel.com";
 const MAX_SIGNAL_LOGS = 100;
+const MIN_LINK_SECRET_LENGTH = 32;
 type GhostLinkGlobal = {
   __ghostLinkMemoryStore__?: Map<string, GhostLink>;
   __ghostLinkMemoryIndex__?: Set<string>;
@@ -129,6 +130,19 @@ function toErrorString(error: unknown): string {
   }
 
   return String(error);
+}
+
+function normalizeLinkSecret(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < MIN_LINK_SECRET_LENGTH) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function createFallbackMessageVariant(link: GhostLink): MessageVariant {
@@ -268,8 +282,9 @@ function sanitizeMessageVariants(link: GhostLink, value: unknown): MessageVarian
 }
 
 function normalizeGhostLink(link: GhostLink): GhostLink {
-  const { createdBy: rawCreatedBy, ...rest } = link;
+  const { createdBy: rawCreatedBy, secret: rawSecret, ...rest } = link;
   const createdBy = normalizeGhostLinkUserId(rawCreatedBy);
+  const secret = normalizeLinkSecret(rawSecret);
   const messageMode = link.messageMode === "multi" ? "multi" : "single";
   const messages = sanitizeMessageVariants(link, link.messages);
   const safeMessages =
@@ -287,6 +302,7 @@ function normalizeGhostLink(link: GhostLink): GhostLink {
 
   return {
     ...rest,
+    ...(secret ? { secret } : {}),
     ...(createdBy ? { createdBy } : {}),
     messageMode,
     messages: safeMessages,

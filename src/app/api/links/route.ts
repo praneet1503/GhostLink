@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { deleteGhostLink, getGhostLink, listGhostLinksByOwner } from "@/lib/kv";
-import { getGhostLinkUserIdFromHeaders } from "@/lib/ownership";
-import type { LinkSummary, LinksResponse } from "@/types";
+import { deleteGhostLink, getGhostLink, listGhostLinks, saveGhostLink } from "@/lib/kv";
+import { sanitizeLinkPayload, type LinkPayloadInput } from "@/lib/linkPayload";
+import type { GhostLink, LinkSummary, LinksResponse } from "@/types";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MIN_SECRET_LENGTH = 32;
+
+type LinkMutationPayloadInput = LinkPayloadInput & {
+  id?: unknown;
+  secret?: unknown;
+};
 
 function resolveBaseUrl(request: NextRequest): string {
   const headerHost =
@@ -43,19 +49,51 @@ function parseLimit(rawValue: string | null): number {
   return Math.min(MAX_LIMIT, Math.max(1, Math.floor(parsed)));
 }
 
-export async function GET(request: NextRequest) {
-  const userId = getGhostLinkUserIdFromHeaders(request.headers);
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Missing or invalid user identity." },
-      { status: 401 },
-    );
+function normalizeLinkId(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
   }
 
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeLinkSecret(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < MIN_SECRET_LENGTH) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function parseIdentity(payload: LinkMutationPayloadInput): {
+  id: string;
+  secret: string;
+} | null {
+  const id = normalizeLinkId(payload.id);
+  const secret = normalizeLinkSecret(payload.secret);
+
+  if (!id || !secret) {
+    return null;
+  }
+
+  return { id, secret };
+}
+
+export async function GET(request: NextRequest) {
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
   const baseUrl = resolveBaseUrl(request);
 
-  const links = await listGhostLinksByOwner(userId, limit);
+  const links = await listGhostLinks(limit);
 
   const summaries: LinkSummary[] = links.map((link) => {
     return {
@@ -74,33 +112,35 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const userId = getGhostLinkUserIdFromHeaders(request.headers);
-  if (!userId) {
+  let payload: LinkMutationPayloadInput;
+  try {
+    payload = (await request.json()) as LinkMutationPayloadInput;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const identity = parseIdentity(payload);
+  if (!identity) {
     return NextResponse.json(
-      { error: "Missing or invalid user identity." },
-      { status: 401 },
+      { error: "Request must include id and secret." },
+      { status: 400 },
     );
   }
 
-  const slug = request.nextUrl.searchParams.get("slug")?.trim();
-  if (!slug) {
-    return NextResponse.json({ error: "Missing slug query parameter." }, { status: 400 });
-  }
-
   try {
-    const link = await getGhostLink(slug);
+    const link = await getGhostLink(identity.id);
     if (!link) {
       return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
     }
 
-    if (link.createdBy !== userId) {
+    if (!link.secret || link.secret !== identity.secret) {
       return NextResponse.json(
-        { error: "You can only delete links created in this browser." },
+        { error: "Unauthorized. Invalid secret for this link." },
         { status: 403 },
       );
     }
 
-    const deleted = await deleteGhostLink(slug);
+    const deleted = await deleteGhostLink(identity.id);
     if (!deleted) {
       return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
     }
@@ -111,6 +151,66 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(
       { error: "Failed to delete link. Please try again." },
       { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  let payload: LinkMutationPayloadInput;
+  try {
+    payload = (await request.json()) as LinkMutationPayloadInput;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const identity = parseIdentity(payload);
+  if (!identity) {
+    return NextResponse.json(
+      { error: "Request must include id and secret." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const link = await getGhostLink(identity.id);
+    if (!link) {
+      return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
+    }
+
+    if (!link.secret || link.secret !== identity.secret) {
+      return NextResponse.json(
+        { error: "Unauthorized. Invalid secret for this link." },
+        { status: 403 },
+      );
+    }
+
+    const sanitized = sanitizeLinkPayload(payload);
+    const updated: GhostLink = {
+      ...link,
+      originalContent: sanitized.originalContent,
+      messageMode: sanitized.messageMode,
+      ...(sanitized.messageMode === "multi"
+        ? {
+            messages: sanitized.messages ?? [],
+            defaultMessageId: sanitized.defaultMessageId,
+          }
+        : {
+            messages: [],
+            defaultMessageId: undefined,
+          }),
+    };
+
+    await saveGhostLink(updated);
+
+    return NextResponse.json({
+      updated: true,
+      id: updated.id,
+    });
+  } catch (error) {
+    console.error("Update failed:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update link." },
+      { status: 400 },
     );
   }
 }
