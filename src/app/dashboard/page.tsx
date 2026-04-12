@@ -5,7 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 import CopyButton from "@/components/CopyButton";
+import {
+  getOrCreateGhostLinkUserId,
+  getStoredGhostLinkSlugs,
+  removeStoredGhostLinkSlug,
+} from "@/lib/localStorageManager";
 import { UI_MESSAGES } from "@/lib/messages";
+import { GHOSTLINK_USER_HEADER } from "@/lib/ownership";
 import type { AnalyticsResponse, LinkSummary, LinksResponse } from "@/types";
 
 function formatTimestamp(value: string): string {
@@ -54,6 +60,9 @@ function getDeviceSplit(devices: Record<string, number>): {
 }
 
 export default function DashboardPage() {
+  const userId = useMemo(() => {
+    return getOrCreateGhostLinkUserId();
+  }, []);
   const [links, setLinks] = useState<LinkSummary[]>([]);
   const [isLoadingLinks, setIsLoadingLinks] = useState(true);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
@@ -75,7 +84,12 @@ export default function DashboardPage() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/links?limit=100", { cache: "no-store" });
+      const response = await fetch("/api/links?limit=100", {
+        cache: "no-store",
+        headers: {
+          [GHOSTLINK_USER_HEADER]: userId,
+        },
+      });
       const payload = (await response.json()) as Partial<LinksResponse> & {
         error?: string;
       };
@@ -84,7 +98,21 @@ export default function DashboardPage() {
         throw new Error(payload.error ?? UI_MESSAGES.fetchLinksFailed);
       }
 
-      const fetchedLinks = payload.links;
+      const serverLinks = payload.links;
+      const savedSlugs = getStoredGhostLinkSlugs();
+      const savedSlugSet = new Set(savedSlugs);
+
+      // Keep localStorage clean when links were deleted on the server.
+      const serverSlugSet = new Set(serverLinks.map((link) => link.id));
+      savedSlugs.forEach((savedSlug) => {
+        if (!serverSlugSet.has(savedSlug)) {
+          removeStoredGhostLinkSlug(savedSlug);
+        }
+      });
+
+      const fetchedLinks = serverLinks.filter((link) => {
+        return savedSlugSet.has(link.id);
+      });
 
       setLinks(fetchedLinks);
       setSelectedLinkId((current) => {
@@ -103,7 +131,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingLinks(false);
     }
-  }, []);
+  }, [userId]);
 
   const handleDeleteLink = useCallback(
     async (link: LinkSummary): Promise<void> => {
@@ -120,6 +148,9 @@ export default function DashboardPage() {
         const response = await fetch(`/api/links?slug=${encodeURIComponent(link.id)}`, {
           method: "DELETE",
           cache: "no-store",
+          headers: {
+            [GHOSTLINK_USER_HEADER]: userId,
+          },
         });
         const payload = (await response.json()) as { error?: string };
 
@@ -131,6 +162,8 @@ export default function DashboardPage() {
           closeExpandedQrModal();
         }
 
+        removeStoredGhostLinkSlug(link.id);
+
         await fetchLinks();
       } catch (error) {
         setErrorMessage(
@@ -140,7 +173,7 @@ export default function DashboardPage() {
         setDeletingSlug(null);
       }
     },
-    [closeExpandedQrModal, expandedQrLink, fetchLinks],
+    [closeExpandedQrModal, expandedQrLink, fetchLinks, userId],
   );
 
   useEffect(() => {
@@ -158,9 +191,16 @@ export default function DashboardPage() {
 
     const run = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/analytics`, {
+        const query = new URLSearchParams({
+          slugs: links.map((link) => link.id).join(","),
+        });
+
+        const response = await fetch(`/api/analytics?${query.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
+          headers: {
+            [GHOSTLINK_USER_HEADER]: userId,
+          },
         });
         const payload = (await response.json()) as Partial<AnalyticsResponse> & {
           error?: string;
@@ -187,7 +227,7 @@ export default function DashboardPage() {
     return () => {
       controller.abort();
     };
-  }, [links]);
+  }, [links, userId]);
 
   useEffect(() => {
     if (!expandedQrLink) {

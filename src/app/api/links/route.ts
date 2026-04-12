@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { deleteGhostLink, listGhostLinks } from "@/lib/kv";
+import { deleteGhostLink, getGhostLink, listGhostLinksByOwner } from "@/lib/kv";
+import { getGhostLinkUserIdFromHeaders } from "@/lib/ownership";
 import type { LinkSummary, LinksResponse } from "@/types";
 
 const DEFAULT_LIMIT = 50;
@@ -43,10 +44,18 @@ function parseLimit(rawValue: string | null): number {
 }
 
 export async function GET(request: NextRequest) {
+  const userId = getGhostLinkUserIdFromHeaders(request.headers);
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Missing or invalid user identity." },
+      { status: 401 },
+    );
+  }
+
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
   const baseUrl = resolveBaseUrl(request);
 
-  const links = await listGhostLinks(limit);
+  const links = await listGhostLinksByOwner(userId, limit);
 
   const summaries: LinkSummary[] = links.map((link) => {
     return {
@@ -65,12 +74,32 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const userId = getGhostLinkUserIdFromHeaders(request.headers);
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Missing or invalid user identity." },
+      { status: 401 },
+    );
+  }
+
   const slug = request.nextUrl.searchParams.get("slug")?.trim();
   if (!slug) {
     return NextResponse.json({ error: "Missing slug query parameter." }, { status: 400 });
   }
 
   try {
+    const link = await getGhostLink(slug);
+    if (!link) {
+      return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });
+    }
+
+    if (link.createdBy !== userId) {
+      return NextResponse.json(
+        { error: "You can only delete links created in this browser." },
+        { status: 403 },
+      );
+    }
+
     const deleted = await deleteGhostLink(slug);
     if (!deleted) {
       return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });

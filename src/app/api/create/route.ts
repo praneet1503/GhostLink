@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getGhostLink, saveGhostLink } from "@/lib/kv";
+import { getGhostLinkUserIdFromHeaders } from "@/lib/ownership";
 import { createSlug } from "@/lib/slugify";
 import type {
   ConditionOperator,
@@ -235,6 +236,14 @@ async function generateUniqueSlug(): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest) {
+  const createdBy = getGhostLinkUserIdFromHeaders(request.headers);
+  if (!createdBy) {
+    return NextResponse.json(
+      { error: "Missing or invalid user identity." },
+      { status: 401 },
+    );
+  }
+
   let payload: CreatePayloadInput;
 
   try {
@@ -271,6 +280,7 @@ export async function POST(request: NextRequest) {
 
       link = {
         id: slug,
+        createdBy,
         createdAt: new Date().toISOString(),
         originalContent: defaultMessage.content,
         messageMode,
@@ -301,6 +311,7 @@ export async function POST(request: NextRequest) {
 
       link = {
         id: slug,
+        createdBy,
         createdAt: new Date().toISOString(),
         originalContent,
         messageMode,

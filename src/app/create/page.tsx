@@ -10,6 +10,12 @@ import MessageRuleBuilder, {
   type DraftMessage,
 } from "@/components/MessageRuleBuilder";
 import {
+  addStoredGhostLinkSlug,
+  getOrCreateGhostLinkUserId,
+} from "@/lib/localStorageManager";
+import { UI_MESSAGES } from "@/lib/messages";
+import { GHOSTLINK_USER_HEADER } from "@/lib/ownership";
+import {
   getDefaultRuleSignal,
   getDefaultValueForSignal,
   isAllowedOperatorForSignal,
@@ -21,7 +27,6 @@ import {
   stringifyConditionValueList,
   type RuleSignalKey,
 } from "@/lib/ruleConditions";
-import { UI_MESSAGES } from "@/lib/messages";
 import { showToast } from "@/lib/toast";
 import type { ConditionOperator, CreateLinkResponse } from "@/types";
 
@@ -131,6 +136,9 @@ export default function CreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdLink, setCreatedLink] = useState<CreateLinkResponse | null>(null);
+  const userId = useMemo(() => {
+    return getOrCreateGhostLinkUserId();
+  }, []);
 
   const canSubmit = useMemo(() => {
     if (mode === "single") {
@@ -328,6 +336,7 @@ export default function CreatePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          [GHOSTLINK_USER_HEADER]: userId,
         },
         body: JSON.stringify(payload),
       });
@@ -338,6 +347,7 @@ export default function CreatePage() {
       }
 
       setCreatedLink({ slug: data.slug, url: data.url });
+      addStoredGhostLinkSlug(data.slug);
       showToast({
         title: UI_MESSAGES.createSuccessToastTitle,
         description: UI_MESSAGES.createSuccessToastDescription,

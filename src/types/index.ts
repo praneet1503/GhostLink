@@ -85,6 +85,7 @@ export interface SignalLog {
 
 export interface GhostLink {
   id: string;
+  createdBy?: string;
   createdAt: string;
   originalContent: OriginalContent;
   messageMode?: MessageMode;

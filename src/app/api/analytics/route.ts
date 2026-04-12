@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getGhostLink, listGhostLinks } from "@/lib/kv";
-import type { AnalyticsResponse } from "@/types";
+import { getGhostLink, listGhostLinksByOwner } from "@/lib/kv";
+import { getGhostLinkUserIdFromHeaders } from "@/lib/ownership";
+import type { AnalyticsResponse, GhostLink } from "@/types";
 
 function incrementCount(counter: Record<string, number>, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
@@ -29,7 +30,7 @@ function resolveBaseUrl(request: NextRequest): string {
   return "http://localhost:3000";
 }
 
-function buildAnalytics(links: Awaited<ReturnType<typeof listGhostLinks>>, baseUrl: string) {
+function buildAnalytics(links: GhostLink[], baseUrl: string) {
   const tones: Record<string, number> = {};
   const referrers: Record<string, number> = {};
   const devices: Record<string, number> = {};
@@ -70,10 +71,46 @@ function buildAnalytics(links: Awaited<ReturnType<typeof listGhostLinks>>, baseU
   };
 }
 
+function parseSlugFilter(rawValue: string | null): Set<string> | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  const slugs = rawValue
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length > 0);
+
+  return new Set(slugs);
+}
+
 export async function GET(request: NextRequest) {
+  const userId = getGhostLinkUserIdFromHeaders(request.headers);
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Missing or invalid user identity." },
+      { status: 401 },
+    );
+  }
+
   const slug = request.nextUrl.searchParams.get("slug")?.trim();
-  const analyticsLinks = slug ? [await getGhostLink(slug)] : await listGhostLinks(5000);
-  const links = analyticsLinks.filter((link): link is NonNullable<typeof link> => Boolean(link));
+  const slugFilter = parseSlugFilter(request.nextUrl.searchParams.get("slugs"));
+
+  const links = slug
+    ? [await getGhostLink(slug)].filter((link): link is NonNullable<typeof link> => {
+        if (!link) {
+          return false;
+        }
+
+        if (link.createdBy !== userId) {
+          return false;
+        }
+
+        return slugFilter ? slugFilter.has(link.id.toLowerCase()) : true;
+      })
+    : (await listGhostLinksByOwner(userId, 5000)).filter((link) => {
+        return slugFilter ? slugFilter.has(link.id.toLowerCase()) : true;
+      });
 
   if (slug && links.length === 0) {
     return NextResponse.json({ error: "GhostLink not found." }, { status: 404 });

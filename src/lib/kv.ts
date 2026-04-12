@@ -17,6 +17,7 @@ import {
   parseConditionValueList,
   stringifyConditionValueList,
 } from "@/lib/ruleConditions";
+import { normalizeGhostLinkUserId } from "@/lib/ownership";
 
 const BLOB_LINK_PREFIX = "ghostlink/links/";
 const BLOB_LINK_SUFFIX = ".json";
@@ -267,6 +268,8 @@ function sanitizeMessageVariants(link: GhostLink, value: unknown): MessageVarian
 }
 
 function normalizeGhostLink(link: GhostLink): GhostLink {
+  const { createdBy: rawCreatedBy, ...rest } = link;
+  const createdBy = normalizeGhostLinkUserId(rawCreatedBy);
   const messageMode = link.messageMode === "multi" ? "multi" : "single";
   const messages = sanitizeMessageVariants(link, link.messages);
   const safeMessages =
@@ -283,7 +286,8 @@ function normalizeGhostLink(link: GhostLink): GhostLink {
       : safeMessages[0]?.id;
 
   return {
-    ...link,
+    ...rest,
+    ...(createdBy ? { createdBy } : {}),
     messageMode,
     messages: safeMessages,
     defaultMessageId,
@@ -618,5 +622,18 @@ export async function listGhostLinks(limit = 100): Promise<GhostLink[]> {
     .sort((a, b) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     })
+    .slice(0, Math.max(1, limit));
+}
+
+export async function listGhostLinksByOwner(ownerId: string, limit = 100): Promise<GhostLink[]> {
+  const normalizedOwnerId = normalizeGhostLinkUserId(ownerId);
+  if (!normalizedOwnerId) {
+    return [];
+  }
+
+  const allLinks = await listGhostLinks(5000);
+
+  return allLinks
+    .filter((link) => link.createdBy === normalizedOwnerId)
     .slice(0, Math.max(1, limit));
 }
